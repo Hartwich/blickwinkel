@@ -30,6 +30,7 @@ const submitMs: Record<BlickwinkelTaskKind, number> = {
 };
 const showcaseMs = 3_600;
 const galleryMs = 7_000;
+const winnerMs = 3_600;
 const scoreboardMs = 7_000;
 const countdownMs = 3_000;
 const maxMediaChars = 85_000;
@@ -207,13 +208,15 @@ function revealCreative(state: BlickwinkelState, context: ServerGameContext): Bl
     }))
     .sort((a, b) => b.votes - a.votes || a.label.localeCompare(b.label));
   const scored = showScoreboard(state, context, entries, winnerIds, deltas);
-  if (!state.round?.useOwnAvatar && !state.round?.useOtherAvatar) return scored;
+  if (winnerIds.length === 0) return scored;
   const avatarsByPlayer = { ...state.avatarsByPlayer };
-  for (const [editorId, media] of Object.entries(state.submissionsByPlayer)) {
-    const targetId = state.avatarTargetByPlayer[editorId];
-    if (targetId && validMedia(media)) avatarsByPlayer[targetId] = media;
+  if (state.round?.useOwnAvatar || state.round?.useOtherAvatar) {
+    for (const [editorId, media] of Object.entries(state.submissionsByPlayer)) {
+      const targetId = state.avatarTargetByPlayer[editorId];
+      if (targetId && validMedia(media)) avatarsByPlayer[targetId] = media;
+    }
   }
-  return { ...scored, avatarsByPlayer };
+  return stageState({ ...scored, avatarsByPlayer }, "winner", context, winnerMs);
 }
 
 function completeSubmit(state: BlickwinkelState, context: ServerGameContext): BlickwinkelState {
@@ -366,6 +369,7 @@ export const serverGame: ServerGame<BlickwinkelState, BlickwinkelInput, Blickwin
       if (state.entries.length <= 1) return revealCreative(state, context);
       return stageState({ ...state, submittedCount: 0 }, "vote", context, null);
     }
+    if (state.stage === "winner") return stageState(state, "scoreboard", context, scoreboardMs);
     if (state.stage === "scoreboard") {
       if (state.roundIndex + 1 >= state.rounds.length) {
         return transitionRoundState({

@@ -58,7 +58,7 @@ export interface BlickwinkelEntry {
 }
 
 export interface BlickwinkelState extends BaseRoundState {
-  stage: "avatar" | "submit" | "showcase" | "gallery" | "vote" | "scoreboard" | "countdown" | "finished";
+  stage: "avatar" | "submit" | "showcase" | "gallery" | "vote" | "winner" | "scoreboard" | "countdown" | "finished";
   rounds: BlickwinkelRound[];
   roundIndex: number;
   round: BlickwinkelRound | null;

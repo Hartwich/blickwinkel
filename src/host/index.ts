@@ -8,7 +8,7 @@ interface HostStateLike {
 interface HostRound { id: string; kind: "pick" | "text" | "photo" | "draw"; category: string; prompt: string; useOtherAvatar?: boolean; useOwnAvatar?: boolean; }
 interface HostEntry { id: string; label: string; text?: string; media?: string; votes?: number; authorName?: string; authorId?: string; }
 interface HostGameState {
-  stage: "avatar" | "submit" | "showcase" | "gallery" | "vote" | "scoreboard" | "countdown" | "finished"; roundIndex: number;
+  stage: "avatar" | "submit" | "showcase" | "gallery" | "vote" | "winner" | "scoreboard" | "countdown" | "finished"; roundIndex: number;
   rounds: HostRound[]; round: HostRound; finishAt: number | null; submittedCount: number;
   playerNames: Array<{ id: string; name: string; avatar?: string }>; totals: Record<string, number>;
   entries: HostEntry[]; winnerIds: string[]; roundScores: Record<string, number>; showcaseIndex: number;
@@ -34,6 +34,13 @@ const styleText = `
 .bw-score-scene{grid-template-rows:auto auto minmax(0,1fr);gap:clamp(6px,1.2vh,16px)}.bw-score-scene>.bw-kicker{justify-content:center;margin:0}.bw-score-scene h1{font-size:clamp(34px,4.8vw,66px)}.bw-score-polaroids{min-height:0;width:min(100%,var(--board-width,1500px));height:100%;margin:auto;display:grid;grid-template-columns:repeat(var(--cols,4),minmax(0,1fr));grid-template-rows:repeat(var(--rows,1),minmax(0,1fr));gap:clamp(10px,1.3vw,22px);padding:clamp(8px,1.2vw,18px);overflow:hidden}.bw-score-polaroid{min-width:0;min-height:0;display:grid;grid-template-rows:minmax(0,1fr) auto;gap:5px;padding:clamp(6px,.8vw,12px);background:#fffdf8;border-radius:4px;box-shadow:0 10px 24px #35243a2a;transform:rotate(var(--tilt,0deg));animation:bw-rise .5s both;animation-delay:calc(var(--i)*40ms);overflow:hidden}.bw-score-photo{display:block;width:100%;height:100%;min-height:0;object-fit:cover;border-radius:2px;background:#e9d8ce}.bw-score-photo-fallback{display:grid;place-items:center;color:#fff;font:900 clamp(50px,8vw,140px) Georgia,serif;background:linear-gradient(135deg,#ec705d,#b85e88)}.bw-score-caption{min-width:0;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:clamp(4px,.8vw,12px);padding:clamp(4px,.6vw,10px) 2px 0;font-size:clamp(12px,1.3vw,21px);color:var(--ink)}.bw-score-rank{font:800 1.25em Georgia,serif;color:var(--coral)}.bw-score-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}.bw-score-points{white-space:nowrap;color:#8d6023;font-variant-numeric:tabular-nums}
 .bw-remix-note{width:fit-content;max-width:100%;margin-top:clamp(12px,2vh,22px)!important;padding:10px 16px;border-radius:9px;background:#e5f2eb;border:1px solid #bad8c8;color:#235f52;font-size:clamp(14px,1.3vw,20px);font-weight:800;line-height:1.3}
 @media(max-height:760px){.bw-score-scene h1{font-size:clamp(27px,4vw,48px)}.bw-score-caption{font-size:clamp(10px,1.1vw,16px)}.bw-score-polaroids{gap:8px;padding:6px}.bw-score-polaroid{padding:6px}}
+.bw-vote-grid{width:100%;height:min(100%,var(--vote-grid-height,100%));min-height:0;display:grid;grid-template-columns:repeat(var(--cols,4),minmax(0,1fr));grid-template-rows:repeat(var(--rows,1),minmax(0,1fr));gap:clamp(8px,1.2vw,18px);align-self:center;padding:8px;overflow:hidden}.bw-vote-card{position:relative;min-width:0;min-height:0;display:grid;grid-template-columns:minmax(72px,27%) minmax(0,1fr);gap:clamp(5px,.8vw,14px);align-items:stretch;padding:clamp(7px,.8vw,13px);background:#fffdf8;border:2px solid #e5d8c6;border-radius:14px;box-shadow:0 8px 20px #392b2017;animation:bw-rise .45s both;animation-delay:calc(var(--i)*45ms)}.bw-vote-identity{min-width:0;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(3px,.5vw,8px);padding-right:clamp(5px,.7vw,12px);border-right:1px solid var(--line)}.bw-vote-card .bw-vote-portrait{display:block;width:min(100%,var(--vote-photo-size,100px));height:min(var(--vote-photo-size,100px),100%);min-height:0;aspect-ratio:1;border:4px solid #f5e9d7;border-radius:8px;object-fit:cover;box-shadow:0 4px 10px #392b2021}.bw-vote-card .bw-vote-portrait.bw-avatar-fallback{display:grid;place-items:center;font-size:clamp(20px,3vw,48px)}.bw-vote-name{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(11px,1.25vw,20px);line-height:1.1}.bw-vote-answer{min-width:0;min-height:0;display:grid;place-items:center;overflow:hidden}.bw-vote-media{display:block;width:100%;height:100%;min-height:0;object-fit:contain}.bw-vote-text{max-width:100%;overflow:hidden;overflow-wrap:anywhere;text-wrap:balance;font:700 clamp(15px,1.9vw,31px)/1.13 Georgia,serif;color:var(--ink)}.bw-vote-grid[style*="--rows: 3"] .bw-vote-text,.bw-vote-grid[style*="--rows: 4"] .bw-vote-text{font-size:clamp(13px,1.35vw,21px)}
+.bw-vote-card.is-image{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);gap:clamp(4px,.6vw,10px)}.bw-vote-image-name{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;color:var(--ink);font-size:clamp(12px,1.25vw,20px);line-height:1.1}.bw-vote-card.is-image .bw-vote-answer{border-top:1px solid var(--line);padding-top:clamp(4px,.5vw,8px)}
+.bw-vote-grid.is-reveal .bw-vote-card:not(.is-winner){opacity:.48;filter:saturate(.65)}.bw-vote-card.is-winner{z-index:1;border-color:#e4ae35;box-shadow:0 0 0 5px #f2bd4b7a,0 18px 38px #9c71343d;animation:bw-winner-card .7s cubic-bezier(.2,.8,.2,1) both}.bw-winner-seal{position:absolute;top:-10px;right:-8px;z-index:3;padding:6px 11px;border-radius:99px;background:#e5aa2e;color:#36231b;box-shadow:0 5px 13px #79541244;font-size:clamp(10px,1vw,15px);font-weight:950;letter-spacing:.08em;transform:rotate(5deg)}.bw-firework{position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden}.bw-spark{position:absolute;left:50%;top:50%;width:clamp(6px,.7vw,11px);height:clamp(6px,.7vw,11px);border-radius:2px;background:var(--spark-color);box-shadow:0 0 12px var(--spark-color);animation:bw-spark .95s var(--delay) cubic-bezier(.12,.7,.25,1) both}@keyframes bw-winner-card{0%{opacity:.6;transform:scale(.94)}55%{opacity:1;transform:scale(1.035)}100%{opacity:1;transform:scale(1)}}@keyframes bw-spark{0%{opacity:0;transform:translate(-50%,-50%) scale(.2) rotate(0)}16%{opacity:1}100%{opacity:0;transform:translate(calc(-50% + var(--x)),calc(-50% + var(--y))) scale(.3) rotate(220deg)}}
+.bw-vote-wait.is-winner-scene{width:100%;grid-template-rows:auto auto minmax(0,1fr);gap:clamp(6px,1vh,12px);overflow:hidden}.bw-vote-wait.is-winner-scene h1{font-size:clamp(30px,4vw,56px)}.bw-vote-wait.is-winner-scene>.bw-kicker{color:#b47b1d}
+.bw-score-polaroids{height:min(100%,var(--board-height,560px));align-self:center;align-content:center;gap:clamp(8px,1vw,18px)}.bw-score-polaroids[data-rows="1"]{transform:translateY(clamp(18px,5vh,55px))}.bw-score-polaroid{position:relative;grid-template-rows:minmax(0,1fr) auto;overflow:hidden;animation:bw-polaroid-in .5s both;animation-delay:calc(var(--i)*55ms)}.bw-score-polaroid.is-gold{--medal:#f6df98;animation:bw-polaroid-in .5s both,bw-medal-reveal .65s 2.1s forwards}.bw-score-polaroid.is-silver{--medal:#dce4eb;animation:bw-polaroid-in .5s both,bw-medal-reveal .65s 2.1s forwards}.bw-score-polaroid.is-bronze{--medal:#e9bea0;animation:bw-polaroid-in .5s both,bw-medal-reveal .65s 2.1s forwards}.bw-score-polaroid.is-gold,.bw-score-polaroid.is-silver,.bw-score-polaroid.is-bronze{animation-delay:calc(var(--i)*55ms),2.1s}.bw-score-photo{object-position:center 35%}.bw-score-caption{z-index:2}.bw-coins{position:absolute;inset:0 0 28px;z-index:3;pointer-events:none;overflow:hidden}.bw-coin{position:absolute;top:-25%;width:clamp(18px,2vw,30px);height:clamp(18px,2vw,30px);display:grid;place-items:center;border:2px solid #b77b16;border-radius:50%;color:#a76c0d;background:radial-gradient(circle at 30% 25%,#fff2ac,#f4c44a 55%,#c98e26);box-shadow:0 3px 5px #66481955;font-size:clamp(9px,1vw,15px);animation:bw-coin-fall 1.15s calc(.45s + var(--coin-i)*.12s) ease-in both}@keyframes bw-polaroid-in{from{opacity:0;transform:translateY(20px) rotate(var(--tilt))}to{opacity:1;transform:translateY(0) rotate(var(--tilt))}}@keyframes bw-coin-fall{0%{opacity:0;top:-25%;transform:rotate(-45deg) scale(.7)}18%{opacity:1}78%{opacity:1;top:48%;transform:rotate(30deg) scale(1)}100%{opacity:0;top:67%;transform:rotate(55deg) scale(.8)}}@keyframes bw-medal-reveal{from{background:#fffdf8}to{background:var(--medal)}}
+.bw-vote-wait.is-vote,.bw-vote-wait.is-winner-scene,.bw-score-scene{height:100%;align-self:stretch}.bw-vote-grid.is-dense .bw-vote-text{font-size:clamp(13px,1.35vw,21px)}.bw-score-polaroid.is-gold,.bw-score-polaroid.is-silver,.bw-score-polaroid.is-bronze{animation-delay:calc(var(--i)*55ms),2.6s}
+@media(max-height:760px){.bw-score-polaroids[data-rows="1"]{transform:translateY(16px)}.bw-vote-card{padding:6px}.bw-vote-name{font-size:clamp(10px,1vw,15px)}}@media(max-width:850px){.bw-vote-card{grid-template-columns:minmax(55px,27%) minmax(0,1fr)}.bw-vote-grid{gap:7px}.bw-score-caption{font-size:clamp(10px,1vw,15px)}}@media(prefers-reduced-motion:reduce){.bw-vote-card.is-winner,.bw-spark,.bw-coin,.bw-score-polaroid,.bw-score-polaroid.is-gold,.bw-score-polaroid.is-silver,.bw-score-polaroid.is-bronze{animation:none!important}.bw-score-polaroid.is-gold,.bw-score-polaroid.is-silver,.bw-score-polaroid.is-bronze{background:var(--medal)}}
 `;
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
@@ -76,6 +83,62 @@ function entryCard(entry: HostEntry, en: boolean, index: number, avatar?: string
   return card;
 }
 
+function voteCard(entry: HostEntry, avatar: string | undefined, en: boolean, index: number, winner = false): HTMLElement {
+  const media = safePhoto(entry.media);
+  const card = el("article", `bw-vote-card${media ? " is-image" : ""}${winner ? " is-winner" : ""}`);
+  card.style.setProperty("--i", String(index));
+  const answer = el("div", "bw-vote-answer");
+  if (media) {
+    const image = el("img", "bw-vote-media"); image.src = media;
+    image.alt = en ? "Submitted photo or drawing" : "Eingereichtes Foto oder Bild";
+    answer.append(image);
+    card.append(el("strong", "bw-vote-image-name", entry.authorName ?? entry.label), answer);
+  } else {
+    const identity = el("div", "bw-vote-identity");
+    const portrait = avatarNode(avatar, entry.authorName ?? entry.label);
+    portrait.classList.add("bw-vote-portrait");
+    identity.append(portrait, el("strong", "bw-vote-name", entry.authorName ?? entry.label));
+    answer.append(el("p", "bw-vote-text", entry.text ?? entry.label));
+    card.append(identity, answer);
+  }
+  if (winner) {
+    card.append(el("span", "bw-winner-seal", en ? "WINNER" : "GEWINNT"));
+    const firework = el("div", "bw-firework");
+    firework.setAttribute("aria-hidden", "true");
+    for (let spark = 0; spark < 14; spark += 1) {
+      const particle = el("i", "bw-spark");
+      const angle = spark * Math.PI * 2 / 14;
+      particle.style.setProperty("--x", `${Math.round(Math.cos(angle) * 100)}px`);
+      particle.style.setProperty("--y", `${Math.round(Math.sin(angle) * 76)}px`);
+      particle.style.setProperty("--spark-color", ["#f2bd4b", "#ec705d", "#559b8d", "#e5a9ba"][spark % 4]!);
+      particle.style.setProperty("--delay", `${spark % 4 * 45}ms`);
+      firework.append(particle);
+    }
+    card.append(firework);
+  }
+  return card;
+}
+
+function voteGrid(state: Partial<HostGameState>, en: boolean, reveal: boolean): HTMLElement {
+  const entries = state.entries ?? [];
+  const { columns, rows } = gridShape(entries.length);
+  const grid = el("div", `bw-vote-grid${reveal ? " is-reveal" : ""}${rows >= 3 ? " is-dense" : ""}`);
+  grid.style.setProperty("--cols", String(columns));
+  grid.style.setProperty("--rows", String(rows));
+  grid.style.setProperty("--vote-grid-height", entries.length <= 4 ? "520px" : entries.length <= 9 ? "660px" : "100%");
+  grid.style.setProperty("--vote-photo-size", entries.length >= 13 ? "64px" : entries.length >= 10 ? "78px" : entries.length >= 7 ? "92px" : entries.length >= 5 ? "108px" : "150px");
+  const avatars = new Map((state.playerNames ?? []).map(({ id, avatar }) => [id, avatar]));
+  entries.forEach((entry, index) => grid.append(voteCard(entry, avatars.get(entry.authorId ?? ""), en, index,
+    reveal && (state.winnerIds ?? []).includes(entry.id))));
+  return grid;
+}
+
+function roundWinnerPlayers(state: Partial<HostGameState>): Set<string> {
+  if (state.round?.kind === "pick") return new Set(state.winnerIds ?? []);
+  const winningEntries = new Set(state.winnerIds ?? []);
+  return new Set((state.entries ?? []).filter(({ id }) => winningEntries.has(id)).map(({ authorId }) => authorId ?? ""));
+}
+
 function scoreboardNode(state: Partial<HostGameState>, en: boolean, final = false): HTMLElement {
   const board = el("section", "bw-scoreboard bw-score-scene");
   board.append(el("p", "bw-kicker", final ? (en ? "FINAL SCORES" : "ENDSTAND") : (en ? "CURRENT SCORES" : "AKTUELLER PUNKTESTAND")),
@@ -83,13 +146,18 @@ function scoreboardNode(state: Partial<HostGameState>, en: boolean, final = fals
   const players = [...(state.playerNames ?? [])].sort((a, b) =>
     (state.totals?.[b.id] ?? 0) - (state.totals?.[a.id] ?? 0) || a.name.localeCompare(b.name));
   const grid = el("div", "bw-score-polaroids");
-  const { columns, rows } = gridShape(players.length);
+  const rows = players.length <= 5 ? 1 : players.length <= 10 ? 2 : 3;
+  const columns = Math.max(1, Math.ceil(players.length / rows));
+  const cardWidth = rows === 1 ? 205 : rows === 2 ? 188 : 165;
   grid.style.setProperty("--cols", String(columns));
   grid.style.setProperty("--rows", String(rows));
-  grid.style.setProperty("--board-width", players.length <= 2 ? "760px" : players.length <= 4 ? "1000px" : "1500px");
-  grid.style.setProperty("--portrait-size", players.length >= 13 ? "65px" : players.length >= 9 ? "85px" : players.length >= 5 ? "105px" : "160px");
+  grid.style.setProperty("--board-width", `${columns * cardWidth + (columns - 1) * 18 + 24}px`);
+  grid.style.setProperty("--board-height", rows === 1 ? "286px" : rows === 2 ? "470px" : "560px");
+  grid.dataset.rows = String(rows);
+  const roundWinners = roundWinnerPlayers(state);
   players.forEach((player, index) => {
-    const card = el("article", "bw-score-polaroid");
+    const medal = index < 3 ? (["gold", "silver", "bronze"] as const)[index] : undefined;
+    const card = el("article", `bw-score-polaroid${medal ? ` is-${medal}` : ""}${roundWinners.has(player.id) ? " is-round-winner" : ""}`);
     card.style.setProperty("--i", String(index));
     card.style.setProperty("--tilt", `${(index % 3 - 1) * 1.2}deg`);
     const src = safePhoto(player.avatar);
@@ -97,6 +165,16 @@ function scoreboardNode(state: Partial<HostGameState>, en: boolean, final = fals
       const photo = el("img", "bw-score-photo"); photo.src = src; photo.alt = player.name;
       card.append(photo);
     } else card.append(el("div", "bw-score-photo bw-score-photo-fallback", player.name.slice(0, 1).toUpperCase()));
+    if (roundWinners.has(player.id)) {
+      const coins = el("div", "bw-coins"); coins.setAttribute("aria-hidden", "true");
+      for (let coinIndex = 0; coinIndex < 7; coinIndex += 1) {
+        const coin = el("span", "bw-coin", "★");
+        coin.style.setProperty("--coin-i", String(coinIndex));
+        coin.style.left = `${10 + coinIndex * 12}%`;
+        coins.append(coin);
+      }
+      card.append(coins);
+    }
     const caption = el("div", "bw-score-caption");
     caption.append(el("span", "bw-score-rank", `${index + 1}.`), el("strong", "bw-score-name", player.name),
       el("b", "bw-score-points", `${state.totals?.[player.id] ?? 0} ${en ? "pts" : "Pkt."}`));
@@ -117,22 +195,22 @@ export function mountBlickwinkelHost(rootInput: unknown, source: HostGameStateSo
   let lastCueKey = "";
   let audio: AudioContext | null = null;
   let ticker = 0;
-  const playCue = (key: string) => {
+  const playCue = (key: string, winner = false) => {
     if (key === lastCueKey) return;
     lastCueKey = key;
     try {
       audio ??= new AudioContext();
       if (audio.state !== "running") void audio.resume();
       const at = audio.currentTime;
-      [523.25, 659.25].forEach((frequency, index) => {
+      (winner ? [523.25, 659.25, 783.99, 1046.5] : [523.25, 659.25]).forEach((frequency, index) => {
         const tone = audio!.createOscillator();
         const gain = audio!.createGain();
-        tone.type = "sine"; tone.frequency.value = frequency;
-        gain.gain.setValueAtTime(0.0001, at + index * .095);
-        gain.gain.exponentialRampToValueAtTime(.055, at + index * .095 + .015);
-        gain.gain.exponentialRampToValueAtTime(.0001, at + index * .095 + .24);
+        tone.type = winner ? "triangle" : "sine"; tone.frequency.value = frequency;
+        gain.gain.setValueAtTime(0.0001, at + index * .12);
+        gain.gain.exponentialRampToValueAtTime(winner ? .075 : .055, at + index * .12 + .015);
+        gain.gain.exponentialRampToValueAtTime(.0001, at + index * .12 + .27);
         tone.connect(gain).connect(audio!.destination);
-        tone.start(at + index * .095); tone.stop(at + index * .095 + .25);
+        tone.start(at + index * .12); tone.stop(at + index * .12 + .28);
       });
     } catch { /* The host can still show the animation if audio is unavailable. */ }
   };
@@ -196,17 +274,16 @@ export function mountBlickwinkelHost(rootInput: unknown, source: HostGameStateSo
       const wait = el("section", "bw-vote-wait is-vote");
       wait.append(el("p", "bw-kicker", en ? "YOUR VOTE" : "EURE STIMME"),
         el("h1", undefined, en ? "Which entry wins?" : "Welches Ergebnis gewinnt?"));
-      const grid = el("div", "bw-gallery-grid");
-      const count = state.entries?.length ?? 0;
-      const { columns, rows } = gridShape(count);
-      grid.style.setProperty("--cols", String(columns));
-      grid.style.setProperty("--rows", String(rows));
-      grid.style.setProperty("--portrait-size", count >= 13 ? "38px" : count >= 10 ? "46px" : count >= 7 ? "56px" : count >= 5 ? "68px" : "86px");
-      grid.style.setProperty("--footer-size", count >= 13 ? "48px" : count >= 10 ? "56px" : count >= 7 ? "66px" : count >= 5 ? "78px" : "98px");
-      (state.entries ?? []).forEach((entry, index) => grid.append(entryCard(entry, en, index,
-        state.playerNames?.find(({ id }) => id === entry.authorId)?.avatar)));
-      wait.append(grid, el("p", "bw-progress", `${state.submittedCount ?? 0} / ${state.playerNames?.length ?? 0} ${en ? "votes" : "Stimmen"}`));
+      wait.append(voteGrid(state, en, false), el("p", "bw-progress", `${state.submittedCount ?? 0} / ${state.playerNames?.length ?? 0} ${en ? "votes" : "Stimmen"}`));
       body.append(wait);
+    } else if (stage === "winner") {
+      const reveal = el("section", "bw-vote-wait is-winner-scene");
+      const winnerCount = state.winnerIds?.length ?? 0;
+      reveal.append(el("p", "bw-kicker", en ? "THE RESULT" : "DIE ENTSCHEIDUNG"),
+        el("h1", undefined, winnerCount === 0 ? (en ? "No entry this time" : "Diesmal kein Ergebnis") : winnerCount > 1 ? (en ? "The winning entries" : "Diese Ergebnisse gewinnen") : (en ? "The winning entry" : "Dieses Ergebnis gewinnt")),
+        voteGrid(state, en, true));
+      body.append(reveal);
+      if (winnerCount) playCue(`winner:${state.roundIndex}`, true);
     } else if (stage === "scoreboard") {
       body.append(scoreboardNode(state, en));
       playCue(`scoreboard:${state.roundIndex}`);
@@ -239,7 +316,6 @@ export function mountBlickwinkelHost(rootInput: unknown, source: HostGameStateSo
       const roster = el("footer", "bw-roster"); (state?.playerNames ?? []).forEach((player, index) => { const chip = el("span", "bw-player"); chip.style.setProperty("--i", String(index)); chip.append(avatarNode(player.avatar, player.name), document.createTextNode(player.name)); roster.append(chip); });
       layout.append(top, body, roster);
       shell.append(layout);
-      const foot = el("div", "bw-footer"); foot.append(el("span", undefined, stage === "submit" ? (en ? "Take your time. The reveal is coming." : "Überlegt in Ruhe. Gleich wird aufgelöst.") : (en ? "Votes are in" : "Alle Stimmen sind da")), el("strong", undefined, "BLICKWINKEL")); shell.append(foot);
       root.replaceChildren(style, shell);
       updateClock(); return;
     }
