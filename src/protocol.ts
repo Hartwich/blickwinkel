@@ -7,6 +7,8 @@ export interface BlickwinkelRound {
   kind: BlickwinkelTaskKind;
   category: string;
   prompt: string;
+  maxStrokes?: 1 | 2;
+  useOtherAvatar?: boolean;
 }
 
 interface BlickwinkelTaskInput extends PlayerInput {
@@ -28,6 +30,7 @@ export interface BlickwinkelTextInput extends BlickwinkelTaskInput {
 export interface BlickwinkelMediaInput extends BlickwinkelTaskInput {
   type: "blickwinkel:media";
   media: string;
+  strokeCount?: number;
 }
 
 export interface BlickwinkelBallotInput extends BlickwinkelTaskInput {
@@ -35,7 +38,13 @@ export interface BlickwinkelBallotInput extends BlickwinkelTaskInput {
   entryId: string;
 }
 
-export type BlickwinkelInput = BlickwinkelPickInput | BlickwinkelTextInput | BlickwinkelMediaInput | BlickwinkelBallotInput;
+export interface BlickwinkelAvatarInput extends PlayerInput {
+  type: "blickwinkel:avatar";
+  runNumber: number;
+  media: string;
+}
+
+export type BlickwinkelInput = BlickwinkelPickInput | BlickwinkelTextInput | BlickwinkelMediaInput | BlickwinkelBallotInput | BlickwinkelAvatarInput;
 
 export interface BlickwinkelEntry {
   id: string;
@@ -44,10 +53,11 @@ export interface BlickwinkelEntry {
   media?: string;
   votes?: number;
   authorName?: string;
+  authorId?: string;
 }
 
 export interface BlickwinkelState extends BaseRoundState {
-  stage: "submit" | "vote" | "reveal" | "finished";
+  stage: "avatar" | "submit" | "showcase" | "gallery" | "vote" | "scoreboard" | "countdown" | "finished";
   rounds: BlickwinkelRound[];
   roundIndex: number;
   round: BlickwinkelRound | null;
@@ -60,15 +70,18 @@ export interface BlickwinkelState extends BaseRoundState {
   totals: Record<string, number>;
   roundScores: Record<string, number>;
   winnerIds: string[];
+  avatarsByPlayer: Record<string, string>;
+  showcaseIndex: number;
 }
 
 export interface BlickwinkelPublicState
-  extends Omit<BlickwinkelState, "submissionsByPlayer" | "ballotsByPlayer" | "entryOwnerById"> {
-  playerNames: Array<{ id: string; name: string }>;
+  extends Omit<BlickwinkelState, "submissionsByPlayer" | "ballotsByPlayer" | "entryOwnerById" | "avatarsByPlayer"> {
+  playerNames: Array<{ id: string; name: string; avatar?: string }>;
 }
 
 export interface BlickwinkelControllerState extends BlickwinkelPublicState {
   hasSubmitted: boolean;
   selectedId?: string;
   ownEntryId?: string;
+  basePhoto?: string;
 }

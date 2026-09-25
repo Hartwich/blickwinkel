@@ -28,8 +28,10 @@ const submitMs: Record<BlickwinkelTaskKind, number> = {
   photo: 90_000,
   draw: 120_000
 };
-const voteMs = 25_000;
-const revealMs = 5_000;
+const showcaseMs = 3_600;
+const galleryMs = 7_000;
+const scoreboardMs = 7_000;
+const countdownMs = 3_000;
 const maxMediaChars = 85_000;
 const jpegDataUrl = /^data:image\/jpeg;base64,\/9j\/[A-Za-z0-9+/]*={0,2}$/;
 
@@ -60,9 +62,16 @@ function chooseRounds(context: ServerGameContext): BlickwinkelRound[] {
     pick: shuffle(getBlickwinkelQuestions(context.language), seed),
     text: shuffle(getCreativeTasks(context.language).filter((task) => task.kind === "text"), seed + 1),
     photo: shuffle(getCreativeTasks(context.language).filter((task) => task.kind === "photo"), seed + 2),
-    draw: shuffle(getCreativeTasks(context.language).filter((task) => task.kind === "draw"), seed + 3)
+    draw: shuffle(getCreativeTasks(context.language).filter((task) => task.kind === "draw" && !task.useOtherAvatar && !task.maxStrokes), seed + 3)
   };
-  return roundKinds.map((kind) => pools[kind].shift()).filter((round): round is BlickwinkelRound => Boolean(round));
+  const specialDraw = getCreativeTasks(context.language).find((task) => task.useOtherAvatar);
+  const limitedDraws = shuffle(getCreativeTasks(context.language).filter((task) => task.maxStrokes), seed + 4);
+  let drawIndex = 0;
+  return roundKinds.map((kind) => {
+    if (kind !== "draw") return pools[kind].shift();
+    drawIndex += 1;
+    return drawIndex === 1 && context.players.length > 1 ? specialDraw : limitedDraws.shift() ?? pools.draw.shift();
+  }).filter((round): round is BlickwinkelRound => Boolean(round));
 }
 
 function isKnownPlayer(context: ServerGameContext, playerId: string): boolean {
@@ -73,18 +82,18 @@ function hasSubmitted(record: Record<string, string>, playerId: string): boolean
   return Object.prototype.hasOwnProperty.call(record, playerId);
 }
 
-function stageState(state: BlickwinkelState, stage: BlickwinkelState["stage"], context: ServerGameContext, durationMs: number): BlickwinkelState {
+function stageState(state: BlickwinkelState, stage: BlickwinkelState["stage"], context: ServerGameContext, durationMs: number | null): BlickwinkelState {
   return {
     ...state,
     stage,
-    finishAt: context.now + durationMs,
+    finishAt: durationMs === null ? null : context.now + durationMs,
     phaseStartedAt: context.now,
-    phaseEndsAt: context.now + durationMs,
+    phaseEndsAt: durationMs === null ? null : context.now + durationMs,
     updatedAt: context.now
   };
 }
 
-function reveal(
+function showScoreboard(
   state: BlickwinkelState,
   context: ServerGameContext,
   entries: BlickwinkelEntry[],
@@ -102,8 +111,8 @@ function reveal(
     roundScores: deltas,
     totals,
     submittedCount: Object.keys(state.ballotsByPlayer).length || Object.keys(state.submissionsByPlayer).length,
-    message: context.language === "en" ? "Here is what the group decided." : "So hat die Gruppe entschieden."
-  }, "reveal", context, revealMs);
+    message: context.language === "en" ? "Here are the current scores." : "Das ist der aktuelle Punktestand."
+  }, "scoreboard", context, scoreboardMs);
 }
 
 function revealPick(state: BlickwinkelState, context: ServerGameContext): BlickwinkelState {
@@ -118,13 +127,17 @@ function revealPick(state: BlickwinkelState, context: ServerGameContext): Blickw
     if (winnerIds.includes(targetId)) deltas[voterId] = (deltas[voterId] ?? 0) + 2;
     deltas[targetId] = (deltas[targetId] ?? 0) + 1;
   }
-  const entries = context.players
-    .map(({ id, name }) => ({ id, label: name, votes: counts[id] ?? 0 }))
-    .sort((a, b) => b.votes - a.votes || a.label.localeCompare(b.label));
-  return reveal(state, context, entries, winnerIds, deltas);
+  const names = new Map(context.players.map(({ id, name }) => [id, name]));
+  const entries: BlickwinkelEntry[] = Object.entries(state.submissionsByPlayer).map(([authorId, targetId], index) => ({
+    id: `pick-${index}`, label: String.fromCharCode(65 + index),
+    authorId, authorName: names.get(authorId) ?? "?", text: names.get(targetId) ?? "?", votes: counts[targetId] ?? 0
+  }));
+  return stageState({ ...state, entries, winnerIds, roundScores: deltas, totals: Object.fromEntries(
+    context.players.map(({ id }) => [id, (state.totals[id] ?? 0) + (deltas[id] ?? 0)])
+  ), showcaseIndex: 0 }, "showcase", context, entries.length ? showcaseMs : galleryMs);
 }
 
-function prepareCreativeVote(state: BlickwinkelState, context: ServerGameContext): BlickwinkelState {
+function prepareCreativeShowcase(state: BlickwinkelState, context: ServerGameContext): BlickwinkelState {
   const authors = shuffle(context.players.filter(({ id }) => hasSubmitted(state.submissionsByPlayer, id)),
     context.now + state.roundIndex * 101);
   const ownerById: Record<string, string> = {};
@@ -135,6 +148,8 @@ function prepareCreativeVote(state: BlickwinkelState, context: ServerGameContext
     return {
       id,
       label: String.fromCharCode(65 + index),
+      authorId: author.id,
+      authorName: author.name,
       ...(state.round?.kind === "text" ? { text: content } : { media: content })
     };
   });
@@ -144,10 +159,10 @@ function prepareCreativeVote(state: BlickwinkelState, context: ServerGameContext
     entryOwnerById: ownerById,
     ballotsByPlayer: {},
     submittedCount: 0,
-    message: context.language === "en" ? "Vote for your favourite entry. Authors stay hidden until the reveal." : "Stimmt für euren Favoriten. Die Namen bleiben bis zur Auflösung geheim."
+    showcaseIndex: 0,
+    message: context.language === "en" ? "Watch every entry on the shared screen." : "Seht euch jede Einsendung auf dem Hauptbildschirm an."
   };
-  if (entries.length > 1) return stageState(next, "vote", context, voteMs);
-  return revealCreative(next, context);
+  return stageState(next, entries.length ? "showcase" : "gallery", context, entries.length ? showcaseMs : galleryMs);
 }
 
 function revealCreative(state: BlickwinkelState, context: ServerGameContext): BlickwinkelState {
@@ -178,11 +193,11 @@ function revealCreative(state: BlickwinkelState, context: ServerGameContext): Bl
       authorName: names.get(state.entryOwnerById[entry.id] ?? "") ?? "?"
     }))
     .sort((a, b) => b.votes - a.votes || a.label.localeCompare(b.label));
-  return reveal(state, context, entries, winnerIds, deltas);
+  return showScoreboard(state, context, entries, winnerIds, deltas);
 }
 
 function completeSubmit(state: BlickwinkelState, context: ServerGameContext): BlickwinkelState {
-  return state.round?.kind === "pick" ? revealPick(state, context) : prepareCreativeVote(state, context);
+  return state.round?.kind === "pick" ? revealPick(state, context) : prepareCreativeShowcase(state, context);
 }
 
 function toPublic(state: BlickwinkelState, context: ServerGameContext): BlickwinkelPublicState {
@@ -190,6 +205,7 @@ function toPublic(state: BlickwinkelState, context: ServerGameContext): Blickwin
     submissionsByPlayer: _submissions,
     ballotsByPlayer: _ballots,
     entryOwnerById: _owners,
+    avatarsByPlayer: _avatars,
     ...publicState
   } = state;
   const rounds = state.rounds.map((round, index) => index <= state.roundIndex ? round : { ...round, prompt: "" });
@@ -198,7 +214,7 @@ function toPublic(state: BlickwinkelState, context: ServerGameContext): Blickwin
     rounds,
     finishAt: state.finishAt === null ? null : Date.now() + Math.max(0, state.finishAt - context.now),
     entries: state.stage === "submit" ? [] : state.entries,
-    playerNames: context.players.map(({ id, name }) => ({ id, name }))
+    playerNames: context.players.map(({ id, name }) => ({ id, name, avatar: state.avatarsByPlayer[id] }))
   };
 }
 
@@ -211,7 +227,7 @@ export const serverGame: ServerGame<BlickwinkelState, BlickwinkelInput, Blickwin
         durationMs: roundPhaseDurations.roundIntroMs,
         message: context.language === "en" ? "How well do you know one another?" : "Wie gut kennt ihr euch?"
       }),
-      stage: "submit",
+      stage: "avatar",
       rounds: [],
       roundIndex: 0,
       round: null,
@@ -223,7 +239,9 @@ export const serverGame: ServerGame<BlickwinkelState, BlickwinkelInput, Blickwin
       submittedCount: 0,
       totals: Object.fromEntries(context.players.map(({ id }) => [id, 0])),
       roundScores: {},
-      winnerIds: []
+      winnerIds: [],
+      avatarsByPlayer: {},
+      showcaseIndex: 0
     };
   },
 
@@ -232,11 +250,11 @@ export const serverGame: ServerGame<BlickwinkelState, BlickwinkelInput, Blickwin
     const round = rounds[0] ?? null;
     return transitionRoundState({
       ...state,
-      stage: "submit",
+      stage: "avatar",
       rounds,
-      roundIndex: 0,
+      roundIndex: -1,
       round,
-      finishAt: round ? context.now + submitMs[round.kind] : null,
+      finishAt: null,
       submissionsByPlayer: {},
       ballotsByPlayer: {},
       entryOwnerById: {},
@@ -244,24 +262,38 @@ export const serverGame: ServerGame<BlickwinkelState, BlickwinkelInput, Blickwin
       submittedCount: 0,
       totals: Object.fromEntries(context.players.map(({ id }) => [id, 0])),
       roundScores: {},
-      winnerIds: []
+      winnerIds: [],
+      avatarsByPlayer: {},
+      showcaseIndex: 0
     }, "playing", context.now, {
       startedAt: context.now,
-      message: context.language === "en" ? "Look at the prompt on your phone." : "Seht euch die Aufgabe auf dem Handy an."
+      message: context.language === "en" ? "Take your character selfie." : "Macht zuerst euer Charakterfoto."
     });
   },
 
   handleInput(state, input, context) {
-    if (state.phase !== "playing" || !state.round || !input || typeof input !== "object" ||
-        input.roundId !== state.round.id || input.roundIndex !== state.roundIndex ||
-        input.runNumber !== context.roundNumber || !isKnownPlayer(context, input.playerId) ||
-        state.finishAt === null || context.now >= state.finishAt) return state;
+    if (state.phase !== "playing" || !input || typeof input !== "object" ||
+        input.runNumber !== context.roundNumber || !isKnownPlayer(context, input.playerId)) return state;
+
+    if (state.stage === "avatar" && input.type === "blickwinkel:avatar") {
+      if (hasSubmitted(state.avatarsByPlayer, input.playerId) || !validMedia(input.media)) return state;
+      const avatarsByPlayer = { ...state.avatarsByPlayer, [input.playerId]: input.media };
+      const next = { ...state, avatarsByPlayer, submittedCount: Object.keys(avatarsByPlayer).length, updatedAt: context.now };
+      return next.submittedCount >= context.players.length && state.round
+        ? stageState({ ...next, submittedCount: 0, message: "" }, "countdown", context, countdownMs)
+        : next;
+    }
+
+    if (!state.round || !("roundId" in input) || input.roundId !== state.round.id ||
+        !("roundIndex" in input) || input.roundIndex !== state.roundIndex) return state;
 
     if (state.stage === "submit") {
+      if (state.finishAt === null || context.now >= state.finishAt) return state;
       if (hasSubmitted(state.submissionsByPlayer, input.playerId)) return state;
       let value: string;
       if (state.round.kind === "pick" && input.type === "blickwinkel:pick") {
-        if (!isKnownPlayer(context, input.targetPlayerId) || input.targetPlayerId === input.playerId) return state;
+        if (!isKnownPlayer(context, input.targetPlayerId) ||
+          (context.players.length > 1 && input.targetPlayerId === input.playerId)) return state;
         value = input.targetPlayerId;
       } else if (state.round.kind === "text" && input.type === "blickwinkel:text") {
         if (typeof input.text !== "string" || input.text.length > 4000) return state;
@@ -269,6 +301,9 @@ export const serverGame: ServerGame<BlickwinkelState, BlickwinkelInput, Blickwin
         if (value.length < 2 || [...value].length > 180) return state;
       } else if ((state.round.kind === "photo" || state.round.kind === "draw") && input.type === "blickwinkel:media") {
         if (!validMedia(input.media)) return state;
+        if (state.round.kind === "draw" && state.round.maxStrokes &&
+          (!Number.isInteger(input.strokeCount) || !input.strokeCount || input.strokeCount < 1 ||
+            input.strokeCount > state.round.maxStrokes)) return state;
         value = input.media;
       } else return state;
 
@@ -293,22 +328,34 @@ export const serverGame: ServerGame<BlickwinkelState, BlickwinkelInput, Blickwin
   tick(state, _deltaMs, context) {
     if (state.phase !== "playing" || state.finishAt === null || context.now < state.finishAt) return state;
     if (state.stage === "submit") return completeSubmit(state, context);
-    if (state.stage === "vote") return revealCreative(state, context);
-    if (state.stage !== "reveal") return state;
+    if (state.stage === "showcase") {
+      if (state.showcaseIndex + 1 < state.entries.length) {
+        return stageState({ ...state, showcaseIndex: state.showcaseIndex + 1 }, "showcase", context, showcaseMs);
+      }
+      return stageState(state, "gallery", context, galleryMs);
+    }
+    if (state.stage === "gallery") {
+      if (state.round?.kind === "pick") return stageState(state, "scoreboard", context, scoreboardMs);
+      if (state.entries.length <= 1) return revealCreative(state, context);
+      return stageState({ ...state, submittedCount: 0 }, "vote", context, null);
+    }
+    if (state.stage === "scoreboard") {
+      if (state.roundIndex + 1 >= state.rounds.length) {
+        return transitionRoundState({
+          ...state,
+          stage: "finished",
+          finishAt: null,
+          message: context.language === "en" ? "The group has spoken!" : "Die Gruppe hat entschieden!"
+        }, "locked", context.now, {
+          durationMs: roundPhaseDurations.lockedMs,
+          message: context.language === "en" ? "The group has spoken!" : "Die Gruppe hat entschieden!"
+        });
+      }
+      return stageState(state, "countdown", context, countdownMs);
+    }
+    if (state.stage !== "countdown") return state;
 
     const nextIndex = state.roundIndex + 1;
-    if (nextIndex >= state.rounds.length) {
-      return transitionRoundState({
-        ...state,
-        stage: "finished",
-        finishAt: null,
-        message: context.language === "en" ? "The group has spoken!" : "Die Gruppe hat entschieden!"
-      }, "locked", context.now, {
-        durationMs: roundPhaseDurations.lockedMs,
-        message: context.language === "en" ? "The group has spoken!" : "Die Gruppe hat entschieden!"
-      });
-    }
-
     const round = state.rounds[nextIndex]!;
     return stageState({
       ...state,
@@ -321,6 +368,7 @@ export const serverGame: ServerGame<BlickwinkelState, BlickwinkelInput, Blickwin
       submittedCount: 0,
       roundScores: {},
       winnerIds: [],
+      showcaseIndex: 0,
       message: context.language === "en" ? "Next task!" : "Die nächste Aufgabe wartet!"
     }, "submit", context, submitMs[round.kind]);
   },
@@ -345,11 +393,17 @@ export const serverGame: ServerGame<BlickwinkelState, BlickwinkelInput, Blickwin
       : state.ballotsByPlayer[playerId];
     return {
       ...toPublic(state, context),
-      hasSubmitted: state.stage === "submit"
+      entries: state.entries.map(({ id, label, authorId, authorName }) => ({ id, label, authorId, authorName })),
+      hasSubmitted: state.stage === "avatar"
+        ? hasSubmitted(state.avatarsByPlayer, playerId)
+        : state.stage === "submit"
         ? hasSubmitted(state.submissionsByPlayer, playerId)
         : hasSubmitted(state.ballotsByPlayer, playerId),
       selectedId,
-      ownEntryId: Object.keys(state.entryOwnerById).find((id) => state.entryOwnerById[id] === playerId)
+      ownEntryId: Object.keys(state.entryOwnerById).find((id) => state.entryOwnerById[id] === playerId),
+      basePhoto: state.round?.useOtherAvatar
+        ? state.avatarsByPlayer[context.players[(context.players.findIndex(({ id }) => id === playerId) + 1) % context.players.length]?.id ?? ""]
+        : undefined
     };
   }
 };

@@ -6,12 +6,12 @@ interface HostStateLike {
   room?: { language?: "de" | "en" } | null;
 }
 interface HostRound { id: string; kind: "pick" | "text" | "photo" | "draw"; category: string; prompt: string; }
-interface HostEntry { id: string; label: string; text?: string; media?: string; votes?: number; authorName?: string; }
+interface HostEntry { id: string; label: string; text?: string; media?: string; votes?: number; authorName?: string; authorId?: string; }
 interface HostGameState {
-  stage: "submit" | "vote" | "reveal" | "finished"; roundIndex: number;
+  stage: "avatar" | "submit" | "showcase" | "gallery" | "vote" | "scoreboard" | "countdown" | "finished"; roundIndex: number;
   rounds: HostRound[]; round: HostRound; finishAt: number | null; submittedCount: number;
-  playerNames: Array<{ id: string; name: string }>; totals: Record<string, number>;
-  entries: HostEntry[]; winnerIds: string[]; roundScores: Record<string, number>;
+  playerNames: Array<{ id: string; name: string; avatar?: string }>; totals: Record<string, number>;
+  entries: HostEntry[]; winnerIds: string[]; roundScores: Record<string, number>; showcaseIndex: number;
 }
 
 const styleText = `
@@ -25,6 +25,9 @@ const styleText = `
 @keyframes bw-rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}@keyframes bw-pop{from{opacity:0;transform:scale(.82) rotate(-8deg)}to{opacity:1;transform:scale(1) rotate(0)}}@keyframes bw-photo{from{opacity:0;transform:translateY(28px) rotate(calc(var(--tilt) - 4deg)) scale(.96)}to{opacity:1;transform:translateY(0) rotate(var(--tilt)) scale(1)}}@keyframes bw-winner{0%{box-shadow:0 0 0 0 #f2bd4b88}70%{box-shadow:0 0 0 14px #f2bd4b00}100%{box-shadow:0 0 0 0 #f2bd4b00}}@media(max-width:850px){.bw-host{padding:20px}.bw-body{grid-template-columns:1fr;gap:20px;align-content:center}.bw-side{grid-template-columns:130px 1fr;align-items:center}.bw-clock{width:120px}.bw-clock strong{font-size:38px}.bw-clock span{transform:translateY(31px);font-size:9px}.bw-progress{text-align:left}.bw-progressbar{grid-column:2}.bw-roster{justify-content:flex-start}.bw-prompt{font-size:clamp(36px,8vw,66px)}.bw-votes{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}.bw-entry{min-height:140px}}
 @media(max-width:560px){.bw-host{padding:17px}.bw-shell{gap:16px}.bw-top{align-items:flex-start}.bw-brand{font-size:14px}.bw-mark{width:30px;height:30px;font-size:20px}.bw-round{text-align:right;font-size:11px}.bw-body{gap:17px}.bw-side{grid-template-columns:96px 1fr;gap:12px}.bw-clock{width:90px}.bw-clock strong{font-size:32px}.bw-clock span{transform:translateY(26px)}.bw-progress{font-size:15px}.bw-roster{gap:6px}.bw-player{padding:6px 9px;font-size:12px}.bw-votes.is-pick .bw-entry{width:42%;min-width:130px}.bw-rankrow{grid-template-columns:35px 1fr auto;padding:12px 5px;gap:10px}}
 @media(prefers-reduced-motion:reduce){.bw-host *, .bw-host *:before,.bw-host *:after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
+.bw-host.is-presentation{background:radial-gradient(circle at 50% 25%,#413553,#241c32 65%,#191421);color:#fffaf2}.bw-host.is-presentation:before{opacity:.08}.bw-host.is-presentation .bw-round,.bw-host.is-presentation .bw-footer,.bw-host.is-presentation .bw-brand{color:#fff9}.bw-host.is-presentation .bw-mark{box-shadow:5px 5px 0 #ffffff24}.bw-presentation{grid-column:1/-1;min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;justify-items:center;align-items:center;gap:clamp(12px,2vh,24px);text-align:center}.bw-presentation .bw-kicker{color:#f4c979;margin:0}.bw-presentation .bw-prompt{font-size:clamp(25px,3vw,44px);max-width:32ch;color:#f8eee3}.bw-feature{min-height:0;width:min(100%,1050px);display:grid;place-items:center;align-content:center;gap:14px;animation:bw-feature .55s cubic-bezier(.16,.8,.2,1) both}.bw-feature img.bw-art{display:block;max-width:100%;max-height:min(61vh,690px);object-fit:contain;border:12px solid #fffdf8;border-bottom-width:24px;border-radius:7px;box-shadow:0 26px 80px #0007}.bw-feature-text{font:700 clamp(37px,5.4vw,82px)/1.07 Georgia,serif;max-width:22ch;overflow-wrap:anywhere;text-wrap:balance}.bw-feature-author{display:flex;align-items:center;gap:12px;font-size:clamp(17px,2vw,28px);font-weight:800}.bw-avatar{width:clamp(36px,5vw,70px);aspect-ratio:1;border-radius:50%;object-fit:cover;border:3px solid #fff}.bw-gallery{grid-column:1/-1;min-height:0;width:100%;display:grid;grid-template-rows:auto 1fr;gap:16px;text-align:center}.bw-gallery .bw-prompt{font-size:clamp(26px,3vw,42px);max-width:none}.bw-gallery-grid{min-height:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(clamp(110px,13vw,220px),1fr));gap:clamp(9px,1.3vw,18px);align-content:center;overflow:auto;padding:8px}.bw-gallery-grid .bw-entry{min-height:120px;max-height:31vh;border-width:5px;border-bottom-width:8px;transform:none}.bw-gallery-grid .bw-entry img{min-height:80px;object-fit:contain}.bw-gallery-grid .bw-entry__text{min-height:90px;font-size:clamp(16px,1.45vw,25px)}.bw-gallery-grid .bw-entry__author{position:static;font-size:clamp(11px,1vw,15px)}.bw-scoreboard{grid-column:1/-1;min-height:0;width:100%;display:grid;grid-template-rows:auto 1fr;gap:12px;text-align:center}.bw-scoreboard h1{font:700 clamp(39px,6vw,80px)/1 Georgia,serif}.bw-scoreboard .bw-rank{width:min(1100px,100%);grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:4px 24px;overflow:auto}.bw-scoreboard .bw-rankrow{font-size:clamp(17px,1.6vw,25px);padding:9px 12px;grid-template-columns:40px 1fr auto}.bw-roster .bw-player img{width:28px;height:28px;border-radius:50%;object-fit:cover}.bw-vote-wait{grid-column:1/-1;display:grid;place-items:center;text-align:center;gap:14px}.bw-vote-wait h1{font:700 clamp(40px,6vw,80px)/1.05 Georgia,serif}.bw-vote-wait p{font-size:clamp(18px,2vw,27px);color:var(--soft)}@keyframes bw-feature{from{opacity:0;transform:scale(.92) translateY(28px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.bw-scoreboard{grid-template-rows:auto auto 1fr}.bw-scoreboard .bw-rankrow{grid-template-columns:30px 44px minmax(0,1fr) auto}.bw-scoreboard .bw-avatar{width:40px;height:40px}.bw-avatar-fallback{display:grid;place-items:center;background:#ec705d;color:#fff;font-weight:900}
+.bw-gallery-grid{grid-template-columns:repeat(var(--cols,4),minmax(0,1fr));grid-template-rows:repeat(var(--rows,1),minmax(0,1fr));height:100%;overflow:hidden;align-content:stretch}.bw-gallery-grid .bw-entry{min-height:0;max-height:none;height:100%}.bw-gallery-grid .bw-entry img{min-height:0;height:calc(100% - 28px);object-fit:contain}.bw-gallery-grid .bw-entry__text{min-height:0;height:calc(100% - 28px);overflow:hidden}.bw-gallery-grid .bw-entry__author{min-height:28px;display:flex;align-items:center;justify-content:center}.bw-presentation .bw-prompt{font-size:clamp(18px,2vw,29px)}.bw-feature-text.is-long{font-size:clamp(28px,3.6vw,54px);max-width:30ch}.bw-vote-wait .bw-gallery-grid{width:100%;min-height:0}
 `;
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
@@ -38,6 +41,26 @@ function safePhoto(value: string | undefined): string | undefined {
   return value && /^data:image\/(?:jpeg|png|webp);base64,[a-z\d+/=]+$/i.test(value) ? value : undefined;
 }
 
+function avatarNode(value: string | undefined, name: string): HTMLElement {
+  const image = safePhoto(value);
+  if (!image) return el("span", "bw-avatar bw-avatar-fallback", name.slice(0, 1).toUpperCase());
+  const node = el("img", "bw-avatar"); node.src = image; node.alt = name; return node;
+}
+
+function entryCard(entry: HostEntry, en: boolean, index: number): HTMLElement {
+  const card = el("article", "bw-entry");
+  card.style.setProperty("--i", String(index));
+  card.style.setProperty("--tilt", "0deg");
+  const media = safePhoto(entry.media);
+  if (media) {
+    const image = el("img"); image.src = media;
+    image.alt = en ? "Player photo or drawing" : "Foto oder Zeichnung eines Spielers";
+    card.append(image);
+  } else card.append(el("div", "bw-entry__text", entry.text ?? entry.label));
+  card.append(el("div", "bw-entry__author", entry.authorName ?? entry.label));
+  return card;
+}
+
 export function mountBlickwinkelHost(rootInput: unknown, source: HostGameStateSource): () => void {
   const root = rootInput as HTMLElement;
   const style = el("style");
@@ -46,10 +69,31 @@ export function mountBlickwinkelHost(rootInput: unknown, source: HostGameStateSo
   root.replaceChildren(style);
   let current: HostStateLike | null = null;
   let lastRenderKey = "";
+  let lastCueKey = "";
+  let audio: AudioContext | null = null;
   let ticker = 0;
+  const playCue = (key: string) => {
+    if (key === lastCueKey) return;
+    lastCueKey = key;
+    try {
+      audio ??= new AudioContext();
+      if (audio.state !== "running") void audio.resume();
+      const at = audio.currentTime;
+      [523.25, 659.25].forEach((frequency, index) => {
+        const tone = audio!.createOscillator();
+        const gain = audio!.createGain();
+        tone.type = "sine"; tone.frequency.value = frequency;
+        gain.gain.setValueAtTime(0.0001, at + index * .095);
+        gain.gain.exponentialRampToValueAtTime(.055, at + index * .095 + .015);
+        gain.gain.exponentialRampToValueAtTime(.0001, at + index * .095 + .24);
+        tone.connect(gain).connect(audio!.destination);
+        tone.start(at + index * .095); tone.stop(at + index * .095 + .25);
+      });
+    } catch { /* The host can still show the animation if audio is unavailable. */ }
+  };
   const draw = (appState: HostStateLike | null) => {
     current = appState;
-    const state = appState?.game?.state as Partial<HostGameState> | undefined;
+    const state = (appState?.game?.state ?? {}) as Partial<HostGameState>;
     const en = appState?.room?.language === "en";
     const renderKey = `${appState?.game?.updatedAt ?? ""}:${appState?.game?.phase ?? ""}:${state?.stage ?? ""}:${appState?.room?.language ?? "de"}`;
     if (renderKey === lastRenderKey) { updateClock(); return; }
@@ -61,7 +105,7 @@ export function mountBlickwinkelHost(rootInput: unknown, source: HostGameStateSo
     brand.append(el("span", "bw-mark", "b"), el("span", undefined, "BLICKWINKEL"));
     const round = el("div", "bw-round");
     round.append(document.createTextNode(en ? "ROUND" : "RUNDE"));
-    const roundNumber = el("b", undefined, `${Math.min((state?.roundIndex ?? 0) + 1, state?.rounds?.length ?? 1).toString().padStart(2, "0")} / ${state?.rounds?.length ?? 8}`);
+    const roundNumber = el("b", undefined, `${Math.max(0, Math.min((state?.roundIndex ?? 0) + 1, state?.rounds?.length ?? 1)).toString().padStart(2, "0")} / ${state?.rounds?.length ?? 10}`);
     round.append(roundNumber);
     top.append(brand, round);
     const body = el("section", "bw-body");
@@ -80,35 +124,73 @@ export function mountBlickwinkelHost(rootInput: unknown, source: HostGameStateSo
         row.append(el("span", undefined, `${index + 1}.`), el("strong", undefined, player.name), el("b", undefined, `${state?.totals?.[player.id] ?? 0} ${en ? "pts" : "Pkt."}`)); rankings.append(row);
       });
       body.append(finish, rankings);
-    } else if (stage === "vote" || stage === "reveal") {
-      const main = el("div", "bw-main");
-      main.append(el("p", "bw-kicker", stage === "reveal" ? (en ? "THE GROUP HAS SPOKEN" : "DIE GRUPPE HAT ENTSCHIEDEN") : (en ? "MAKE YOUR PICK" : "GEBT EUREN TIPP AB")), el("h1", "bw-prompt", state?.round?.prompt ?? ""), el("span", "bw-kind", `${kindIcon(state?.round?.kind)}  ${kindLabel(state?.round?.kind, en)}`));
-      const board = el("div", `bw-votes ${state?.round?.kind === "pick" ? "is-pick" : ""} ${stage === "reveal" ? "bw-reveal" : ""}`);
-      (state?.entries ?? []).forEach((entry, index) => {
-        const card = el("article", `bw-entry ${stage === "reveal" && state?.winnerIds?.includes(entry.id) ? "bw-winner" : ""}`); card.style.setProperty("--i", String(index)); card.style.setProperty("--tilt", `${(index % 3 - 1) * 1.3}deg`);
+    } else if (stage === "showcase") {
+      shell.classList.add("is-presentation");
+      const entry = state.entries?.[state.showcaseIndex ?? 0];
+      const presentation = el("section", "bw-presentation");
+      presentation.append(el("p", "bw-kicker", `${en ? "ENTRY" : "ERGEBNIS"} ${(state.showcaseIndex ?? 0) + 1} / ${state.entries?.length ?? 0}`));
+      const feature = el("div", "bw-feature");
+      if (entry) {
         const media = safePhoto(entry.media);
-        if (media) { const image = el("img"); image.src = media; image.alt = en ? "Player photo or drawing" : "Foto oder Zeichnung eines Spielers"; card.append(image); }
-        else card.append(el("div", "bw-entry__text", entry.text ?? entry.label));
-        if (stage === "reveal") {
-          const author = el("div", "bw-entry__author"); author.append(el("span", undefined, entry.authorName ?? entry.label), el("b", undefined, `${entry.votes ?? 0} ${en ? "votes" : "Stimmen"}`)); card.append(author);
-        } else if (entry.votes !== undefined) card.append(el("span", "bw-vote-count", String(entry.votes)));
-        board.append(card);
-      });
-      if (stage === "reveal") {
-        body.append(main, board);
-      } else {
-        const side = el("aside", "bw-side");
-        const clock = el("div", "bw-clock"); clock.append(el("strong", undefined, "—"), el("span", undefined, en ? "SECONDS" : "SEKUNDEN"));
-        const info = el("div");
-        const count = el("p", "bw-progress");
-        const total = state?.playerNames?.length ?? 0;
-        count.textContent = `${state?.submittedCount ?? 0} / ${total} ${en ? "ready" : "bereit"}`;
-        const bar = el("div", "bw-progressbar"); const fill = el("i"); fill.style.setProperty("--done", `${total ? Math.min(100, (state?.submittedCount ?? 0) / total * 100) : 0}%`); bar.append(fill); info.append(count, bar);
-        side.append(clock, info);
-        const roster = el("footer", "bw-roster");
-        (state?.playerNames ?? []).forEach((player, index) => { const chip = el("span", "bw-player"); chip.style.setProperty("--i", String(index)); chip.append(el("i"), document.createTextNode(player.name)); roster.append(chip); });
-        body.append(main, side); layout.append(top, body, roster); shell.append(layout); const foot = el("div", "bw-footer"); foot.append(el("span", undefined, en ? "Choose on your phone" : "Stimmt geheim am Handy ab"), el("strong", undefined, "BLICKWINKEL")); shell.append(foot); root.replaceChildren(style, shell); updateClock(); return;
+        if (media) { const image = el("img", "bw-art"); image.src = media; image.alt = en ? "Submission" : "Einsendung"; feature.append(image); }
+        else feature.append(el("div", `bw-feature-text ${(entry.text?.length ?? 0) > 80 ? "is-long" : ""}`, entry.text ?? entry.label));
+        const author = el("div", "bw-feature-author");
+        const player = state.playerNames?.find(({ id }) => id === entry.authorId);
+        author.append(avatarNode(player?.avatar, entry.authorName ?? "?"), el("span", undefined, entry.authorName ?? "?"));
+        feature.append(author);
       }
+      presentation.append(feature, el("p", "bw-prompt", state.round?.prompt ?? ""));
+      body.append(presentation);
+      playCue(`showcase:${state.roundIndex}:${state.showcaseIndex}`);
+    } else if (stage === "gallery") {
+      shell.classList.add("is-presentation");
+      const gallery = el("section", "bw-gallery");
+      gallery.append(el("h1", "bw-prompt", en ? "All perspectives at a glance" : "Alle Blickwinkel auf einen Blick"));
+      const grid = el("div", "bw-gallery-grid");
+      const count = state.entries?.length ?? 0;
+      const columns = Math.max(1, count <= 4 ? count : count <= 9 ? 3 : 4);
+      grid.style.setProperty("--cols", String(columns));
+      grid.style.setProperty("--rows", String(Math.max(1, Math.ceil(count / columns))));
+      (state.entries ?? []).forEach((entry, index) => grid.append(entryCard(entry, en, index)));
+      gallery.append(grid); body.append(gallery);
+      playCue(`gallery:${state.roundIndex}`);
+    } else if (stage === "vote") {
+      const wait = el("section", "bw-vote-wait");
+      wait.append(el("p", "bw-kicker", en ? "YOUR VOTE" : "EURE STIMME"),
+        el("h1", undefined, en ? "Which entry wins?" : "Welches Ergebnis gewinnt?"),
+        el("p", undefined, en ? "Choose a name on your phone. Take your time." : "Wählt einen Namen auf dem Handy. Ihr habt keinen Zeitdruck."));
+      const grid = el("div", "bw-gallery-grid");
+      const count = state.entries?.length ?? 0;
+      const columns = Math.max(1, count <= 4 ? count : count <= 9 ? 3 : 4);
+      grid.style.setProperty("--cols", String(columns));
+      grid.style.setProperty("--rows", String(Math.max(1, Math.ceil(count / columns))));
+      (state.entries ?? []).forEach((entry, index) => grid.append(entryCard(entry, en, index)));
+      wait.append(grid, el("p", "bw-progress", `${state.submittedCount ?? 0} / ${state.playerNames?.length ?? 0} ${en ? "votes" : "Stimmen"}`));
+      body.append(wait);
+    } else if (stage === "scoreboard") {
+      const board = el("section", "bw-scoreboard");
+      board.append(el("p", "bw-kicker", en ? "CURRENT SCORES" : "AKTUELLER PUNKTESTAND"),
+        el("h1", undefined, en ? "Here’s where everyone stands" : "So steht ihr gerade"));
+      const rankings = el("div", "bw-rank");
+      [...(state.playerNames ?? [])].sort((a, b) => (state.totals?.[b.id] ?? 0) - (state.totals?.[a.id] ?? 0)).forEach((player, index) => {
+        const row = el("div", "bw-rankrow"); row.style.setProperty("--i", String(index));
+        row.append(el("span", undefined, `${index + 1}.`), avatarNode(player.avatar, player.name), el("strong", undefined, player.name), el("b", undefined, `${state.totals?.[player.id] ?? 0}`));
+        rankings.append(row);
+      });
+      board.append(rankings); body.append(board);
+      playCue(`scoreboard:${state.roundIndex}`);
+    } else if (stage === "countdown") {
+      const next = el("section", "bw-vote-wait");
+      next.append(el("p", "bw-kicker", en ? "NEXT TASK" : "NÄCHSTE AUFGABE"), el("h1", undefined, (state.roundIndex ?? 0) < 0 ? (en ? "Here we go!" : "Los geht’s!") : (en ? "Ready for the next one?" : "Bereit für die nächste Aufgabe?")));
+      const clock = el("div", "bw-clock"); clock.append(el("strong", undefined, "3"), el("span", undefined, en ? "SECONDS" : "SEKUNDEN")); next.append(clock);
+      body.append(next);
+    } else if (stage === "avatar") {
+      const intro = el("section", "bw-vote-wait");
+      intro.append(el("p", "bw-kicker", en ? "YOUR CHARACTER" : "EUER CHARAKTER"),
+        el("h1", undefined, en ? "One selfie for the whole game" : "Ein Selfie für das ganze Spiel"),
+        el("p", undefined, en ? "Take your character photo on your phone." : "Macht euer Charakterfoto auf dem Handy."),
+        el("p", "bw-progress", `${state.submittedCount ?? 0} / ${state.playerNames?.length ?? 0}`));
+      body.append(intro);
     } else {
       const main = el("div", "bw-main");
       const kind = state?.round?.kind;
@@ -118,7 +200,7 @@ export function mountBlickwinkelHost(rootInput: unknown, source: HostGameStateSo
       const info = el("div"); const count = el("p", "bw-progress", `${state?.submittedCount ?? 0} / ${state?.playerNames?.length ?? 0} ${en ? "in" : "abgegeben"}`);
       const bar = el("div", "bw-progressbar"); const fill = el("i"); const total = state?.playerNames?.length ?? 0; fill.style.setProperty("--done", `${total ? Math.min(100, (state?.submittedCount ?? 0) / total * 100) : 0}%`); bar.append(fill); info.append(count, bar); side.append(clock, info);
       body.append(main, side);
-      const roster = el("footer", "bw-roster"); (state?.playerNames ?? []).forEach((player, index) => { const chip = el("span", "bw-player"); chip.style.setProperty("--i", String(index)); chip.append(el("i"), document.createTextNode(player.name)); roster.append(chip); });
+      const roster = el("footer", "bw-roster"); (state?.playerNames ?? []).forEach((player, index) => { const chip = el("span", "bw-player"); chip.style.setProperty("--i", String(index)); chip.append(avatarNode(player.avatar, player.name), document.createTextNode(player.name)); roster.append(chip); });
       layout.append(top, body, roster);
       shell.append(layout);
       const foot = el("div", "bw-footer"); foot.append(el("span", undefined, stage === "submit" ? (en ? "Take your time. The reveal is coming." : "Überlegt in Ruhe. Gleich wird aufgelöst.") : (en ? "Votes are in" : "Alle Stimmen sind da")), el("strong", undefined, "BLICKWINKEL")); shell.append(foot);
@@ -136,14 +218,14 @@ export function mountBlickwinkelHost(rootInput: unknown, source: HostGameStateSo
     if (!node || !clock) return;
     const remaining = state?.finishAt ? Math.max(0, Math.ceil((state.finishAt - Date.now()) / 1000)) : null;
     node.textContent = remaining === null ? "∞" : String(remaining);
-    const duration = state?.stage === "vote" ? 25_000 : state?.round?.kind === "pick" ? 25_000 : state?.round?.kind === "text" ? 70_000 : state?.round?.kind === "photo" ? 90_000 : 120_000;
+    const duration = state?.stage === "countdown" ? 3_000 : state?.round?.kind === "pick" ? 25_000 : state?.round?.kind === "text" ? 70_000 : state?.round?.kind === "photo" ? 90_000 : 120_000;
     clock.style.setProperty("--progress", `${remaining === null ? 100 : Math.max(0, Math.min(100, remaining / (duration / 1000) * 100))}%`);
   };
   const typedSource = source as HostGameStateSource<HostStateLike>;
   const unsubscribe = typedSource.subscribe(draw);
   const initial = typedSource.getState(); if (initial) draw(initial);
   ticker = window.setInterval(updateClock, 250);
-  return () => { unsubscribe(); window.clearInterval(ticker); root.replaceChildren(); root.className = ""; };
+  return () => { unsubscribe(); window.clearInterval(ticker); if (audio) void audio.close(); root.replaceChildren(); root.className = ""; };
 }
 
 function kindLabel(kind: string | undefined, en: boolean): string {

@@ -5,6 +5,8 @@ export type CreativeTask = {
   kind: "text" | "photo" | "draw";
   category: string;
   prompt: string;
+  maxStrokes?: 1 | 2;
+  useOtherAvatar?: boolean;
 };
 
 type TaskRow = readonly [CreativeTask["kind"], string, string, string, string];
@@ -57,6 +59,9 @@ const rows: readonly TaskRow[] = [
   ["draw", "Kritzelei", "Zeichnet auf einer leeren Fläche ein Raumschiff, das von einem Snack angetrieben wird.", "On a blank canvas, draw a spaceship powered by a snack.", "draw-snackship"],
   ["draw", "Foto-Remix", "Malt eurem Selfie eine Sprechblase mit einem kurzen, freundlichen Satz.", "Add a speech bubble with a short, friendly line to your selfie.", "draw-speech"],
   ["draw", "Kritzelei", "Zeichnet ein neues Fantasie-Logo für eure Gruppe, nur aus Formen und Linien.", "Draw a new imaginary logo for your group using only shapes and lines.", "draw-logo"],
+  ["draw", "Foto-Remix", "Ihr bekommt das Selfie einer anderen Person. Verwandelt es mit einer Zeichnung in eine Filmfigur.", "You get another player's selfie. Turn it into a movie character with a drawing.", "draw-other-selfie"],
+  ["draw", "Ein Strich", "Zeichnet mit genau einem Strich ein völlig neues Haustier für eure Gruppe.", "Draw a brand-new group pet using exactly one stroke.", "draw-one-stroke"],
+  ["draw", "Zwei Striche", "Zeichnet mit höchstens zwei Strichen eine lustige neue Frisur.", "Draw a funny new hairstyle using at most two strokes.", "draw-two-strokes"],
 ];
 
 export function getCreativeTasks(language: SupportedLanguage): CreativeTask[] {
@@ -66,5 +71,8 @@ export function getCreativeTasks(language: SupportedLanguage): CreativeTask[] {
     kind,
     category,
     prompt: english ? en : de,
+    ...(id === "draw-one-stroke" ? { maxStrokes: 1 as const } : {}),
+    ...(id === "draw-two-strokes" ? { maxStrokes: 2 as const } : {}),
+    ...(id === "draw-other-selfie" ? { useOtherAvatar: true } : {}),
   }));
 }

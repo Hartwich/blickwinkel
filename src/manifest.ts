@@ -4,8 +4,8 @@ export const blickwinkelManifest = {
   id: "blickwinkel",
   displayName: "Blickwinkel",
   description: "Wie gut kennt ihr euch? Stimmt ab, schreibt Antworten, macht Fotos und zeichnet auf Bildern.",
-  minPlayers: 3,
-  maxPlayers: 8,
+  minPlayers: 1,
+  maxPlayers: 16,
   hostView: "BlickwinkelHostScene",
   controllerView: "blickwinkel",
   controllerLayout: "social_party",
@@ -25,7 +25,9 @@ export const blickwinkelManifest = {
     track: { profile: "gentle", bpm: 96, rootMidi: 60, masterGain: 0.1 },
     trackByStage: {
       vote: { profile: "mystery", bpm: 104, rootMidi: 60, masterGain: 0.09 },
-      reveal: { profile: "sugarCountry", bpm: 108, rootMidi: 60, masterGain: 0.11 },
+      showcase: { profile: "sugarCountry", bpm: 108, rootMidi: 60, masterGain: 0.11 },
+      gallery: { profile: "sugarCountry", bpm: 108, rootMidi: 60, masterGain: 0.11 },
+      scoreboard: { profile: "sugarCountry", bpm: 108, rootMidi: 60, masterGain: 0.11 },
       finished: { profile: "sugarCountry", bpm: 94, rootMidi: 60, masterGain: 0.1 }
     }
   },
