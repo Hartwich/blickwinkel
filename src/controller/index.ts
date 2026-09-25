@@ -64,8 +64,10 @@ export const controllerGame = {
             ? en ? "Write a short answer. The group will vote anonymously." : "Schreibe eine kurze Antwort. Danach stimmt die Gruppe anonym ab."
           : kind === "photo"
               ? en ? "Take a photo or choose one from your phone. Review it before sending." : "Nimm ein Foto auf oder wähle eines aus. Prüfe es vor dem Senden."
-              : game.basePhoto
-                ? en ? "Draw on the other player's selfie." : "Zeichne auf dem Selfie der anderen Person."
+              : round?.useOtherAvatar
+                ? en ? "Edit the assigned selfie. After voting, it becomes that person's new character photo." : "Bearbeite das zugeteilte Selfie. Nach der Abstimmung wird es das neue Charakterbild der Person."
+                : round?.useOwnAvatar
+                  ? en ? "Edit your selfie. After voting, it becomes your new character photo." : "Bearbeite dein Selfie. Nach der Abstimmung wird es dein neues Charakterbild."
                 : en ? "Draw on the canvas. Send when you are happy with it." : "Zeichne auf der Fläche und sende dein Bild."
       : stage === "vote"
         ? game.hasSubmitted

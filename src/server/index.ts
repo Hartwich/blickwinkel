@@ -20,7 +20,7 @@ import type {
 } from "../protocol.js";
 
 const roundKinds: readonly BlickwinkelTaskKind[] = [
-  "pick", "text", "pick", "photo", "pick", "draw", "text", "pick", "photo", "draw"
+  "pick", "text", "photo", "draw", "pick", "draw", "text", "pick", "photo", "draw", "pick", "draw"
 ];
 const submitMs: Record<BlickwinkelTaskKind, number> = {
   pick: 25_000,
@@ -58,20 +58,33 @@ function shuffle<T>(values: readonly T[], seed: number): T[] {
 
 function chooseRounds(context: ServerGameContext): BlickwinkelRound[] {
   const seed = context.now + context.roundNumber * 7919;
+  const tasks = getCreativeTasks(context.language);
   const pools: Record<BlickwinkelTaskKind, BlickwinkelRound[]> = {
     pick: shuffle(getBlickwinkelQuestions(context.language), seed),
-    text: shuffle(getCreativeTasks(context.language).filter((task) => task.kind === "text"), seed + 1),
-    photo: shuffle(getCreativeTasks(context.language).filter((task) => task.kind === "photo"), seed + 2),
-    draw: shuffle(getCreativeTasks(context.language).filter((task) => task.kind === "draw" && !task.useOtherAvatar && !task.maxStrokes), seed + 3)
+    text: shuffle(tasks.filter((task) => task.kind === "text"), seed + 1),
+    photo: shuffle(tasks.filter((task) => task.kind === "photo"), seed + 2),
+    draw: shuffle(tasks.filter((task) => task.kind === "draw" && !task.useOtherAvatar && !task.useOwnAvatar && !task.maxStrokes), seed + 3)
   };
-  const specialDraw = getCreativeTasks(context.language).find((task) => task.useOtherAvatar);
-  const limitedDraws = shuffle(getCreativeTasks(context.language).filter((task) => task.maxStrokes), seed + 4);
+  const otherAvatarDraws = shuffle(tasks.filter((task) => task.useOtherAvatar), seed + 4);
+  const ownAvatarDraws = shuffle(tasks.filter((task) => task.useOwnAvatar), seed + 5);
+  const limitedDraws = shuffle(tasks.filter((task) => task.maxStrokes), seed + 6);
   let drawIndex = 0;
   return roundKinds.map((kind) => {
     if (kind !== "draw") return pools[kind].shift();
     drawIndex += 1;
-    return drawIndex === 1 && context.players.length > 1 ? specialDraw : limitedDraws.shift() ?? pools.draw.shift();
+    if (drawIndex === 1) return (context.players.length > 1 ? otherAvatarDraws : ownAvatarDraws).shift();
+    if (drawIndex === 2) return ownAvatarDraws.shift();
+    if (drawIndex === 3) return pools.draw.shift();
+    return limitedDraws.shift();
   }).filter((round): round is BlickwinkelRound => Boolean(round));
+}
+
+function avatarTargets(round: BlickwinkelRound, players: ServerGameContext["players"]): Record<string, string> {
+  if (!round.useOtherAvatar && !round.useOwnAvatar) return {};
+  return Object.fromEntries(players.map((player, index) => [
+    player.id,
+    round.useOtherAvatar ? players[(index + 1) % players.length]?.id ?? player.id : player.id
+  ]));
 }
 
 function isKnownPlayer(context: ServerGameContext, playerId: string): boolean {
@@ -193,7 +206,14 @@ function revealCreative(state: BlickwinkelState, context: ServerGameContext): Bl
       authorName: names.get(state.entryOwnerById[entry.id] ?? "") ?? "?"
     }))
     .sort((a, b) => b.votes - a.votes || a.label.localeCompare(b.label));
-  return showScoreboard(state, context, entries, winnerIds, deltas);
+  const scored = showScoreboard(state, context, entries, winnerIds, deltas);
+  if (!state.round?.useOwnAvatar && !state.round?.useOtherAvatar) return scored;
+  const avatarsByPlayer = { ...state.avatarsByPlayer };
+  for (const [editorId, media] of Object.entries(state.submissionsByPlayer)) {
+    const targetId = state.avatarTargetByPlayer[editorId];
+    if (targetId && validMedia(media)) avatarsByPlayer[targetId] = media;
+  }
+  return { ...scored, avatarsByPlayer };
 }
 
 function completeSubmit(state: BlickwinkelState, context: ServerGameContext): BlickwinkelState {
@@ -206,6 +226,7 @@ function toPublic(state: BlickwinkelState, context: ServerGameContext): Blickwin
     ballotsByPlayer: _ballots,
     entryOwnerById: _owners,
     avatarsByPlayer: _avatars,
+    avatarTargetByPlayer: _avatarTargets,
     ...publicState
   } = state;
   const rounds = state.rounds.map((round, index) => index <= state.roundIndex ? round : { ...round, prompt: "" });
@@ -241,6 +262,7 @@ export const serverGame: ServerGame<BlickwinkelState, BlickwinkelInput, Blickwin
       roundScores: {},
       winnerIds: [],
       avatarsByPlayer: {},
+      avatarTargetByPlayer: {},
       showcaseIndex: 0
     };
   },
@@ -264,6 +286,7 @@ export const serverGame: ServerGame<BlickwinkelState, BlickwinkelInput, Blickwin
       roundScores: {},
       winnerIds: [],
       avatarsByPlayer: {},
+      avatarTargetByPlayer: {},
       showcaseIndex: 0
     }, "playing", context.now, {
       startedAt: context.now,
@@ -372,6 +395,7 @@ export const serverGame: ServerGame<BlickwinkelState, BlickwinkelInput, Blickwin
       submittedCount: 0,
       roundScores: {},
       winnerIds: [],
+      avatarTargetByPlayer: avatarTargets(round, context.players),
       showcaseIndex: 0,
       message: context.language === "en" ? "Next task!" : "Die nächste Aufgabe wartet!"
     }, "submit", context, submitMs[round.kind]);
@@ -405,8 +429,8 @@ export const serverGame: ServerGame<BlickwinkelState, BlickwinkelInput, Blickwin
         : hasSubmitted(state.ballotsByPlayer, playerId),
       selectedId,
       ownEntryId: Object.keys(state.entryOwnerById).find((id) => state.entryOwnerById[id] === playerId),
-      basePhoto: state.round?.useOtherAvatar
-        ? state.avatarsByPlayer[context.players[(context.players.findIndex(({ id }) => id === playerId) + 1) % context.players.length]?.id ?? ""]
+      basePhoto: state.round?.useOtherAvatar || state.round?.useOwnAvatar
+        ? state.avatarsByPlayer[state.avatarTargetByPlayer[playerId] ?? ""]
         : undefined
     };
   }

@@ -5,7 +5,7 @@ interface HostStateLike {
   game?: { phase?: string; state?: unknown; updatedAt?: number } | null;
   room?: { language?: "de" | "en" } | null;
 }
-interface HostRound { id: string; kind: "pick" | "text" | "photo" | "draw"; category: string; prompt: string; }
+interface HostRound { id: string; kind: "pick" | "text" | "photo" | "draw"; category: string; prompt: string; useOtherAvatar?: boolean; useOwnAvatar?: boolean; }
 interface HostEntry { id: string; label: string; text?: string; media?: string; votes?: number; authorName?: string; authorId?: string; }
 interface HostGameState {
   stage: "avatar" | "submit" | "showcase" | "gallery" | "vote" | "scoreboard" | "countdown" | "finished"; roundIndex: number;
@@ -32,6 +32,7 @@ const styleText = `
 .bw-presentation .bw-kicker{color:var(--coral)}.bw-presentation .bw-prompt{color:var(--ink)}.bw-gallery{grid-template-rows:minmax(0,1fr)}.bw-vote-wait.is-vote{grid-template-rows:auto auto minmax(0,1fr) auto;gap:clamp(6px,1vh,12px)}.bw-vote-wait.is-vote h1{font-size:clamp(30px,4vw,56px)}.bw-vote-wait.is-vote>.bw-progress{font-size:clamp(14px,1.4vw,21px)}
 .bw-gallery-grid .bw-entry img:not(.bw-entry__portrait),.bw-gallery-grid .bw-entry__text{height:calc(100% - var(--footer-size,78px));min-height:0}.bw-gallery-grid .bw-entry__author{height:var(--footer-size,78px);min-height:0;display:flex;align-items:center;justify-content:center;gap:clamp(5px,1vw,13px);padding:4px 6px;position:static;background:#fff;color:var(--ink);font-size:clamp(12px,1.3vw,21px);overflow:hidden}.bw-gallery-grid .bw-entry__author strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bw-gallery-grid .bw-entry .bw-entry__portrait{display:block;width:var(--portrait-size,68px);height:var(--portrait-size,68px);min-width:var(--portrait-size,68px);min-height:0;max-height:100%;border:3px solid #f7eee2;border-radius:4px;object-fit:cover;box-shadow:0 2px 8px #34231f22}.bw-gallery-grid .bw-entry .bw-entry__portrait.bw-avatar-fallback{display:grid;place-items:center}.bw-gallery-grid .bw-entry{border-bottom-width:5px}.bw-gallery-grid .bw-entry__text{font-size:clamp(15px,1.6vw,28px)}
 .bw-score-scene{grid-template-rows:auto auto minmax(0,1fr);gap:clamp(6px,1.2vh,16px)}.bw-score-scene>.bw-kicker{justify-content:center;margin:0}.bw-score-scene h1{font-size:clamp(34px,4.8vw,66px)}.bw-score-polaroids{min-height:0;width:min(100%,var(--board-width,1500px));height:100%;margin:auto;display:grid;grid-template-columns:repeat(var(--cols,4),minmax(0,1fr));grid-template-rows:repeat(var(--rows,1),minmax(0,1fr));gap:clamp(10px,1.3vw,22px);padding:clamp(8px,1.2vw,18px);overflow:hidden}.bw-score-polaroid{min-width:0;min-height:0;display:grid;grid-template-rows:minmax(0,1fr) auto;gap:5px;padding:clamp(6px,.8vw,12px);background:#fffdf8;border-radius:4px;box-shadow:0 10px 24px #35243a2a;transform:rotate(var(--tilt,0deg));animation:bw-rise .5s both;animation-delay:calc(var(--i)*40ms);overflow:hidden}.bw-score-photo{display:block;width:100%;height:100%;min-height:0;object-fit:cover;border-radius:2px;background:#e9d8ce}.bw-score-photo-fallback{display:grid;place-items:center;color:#fff;font:900 clamp(50px,8vw,140px) Georgia,serif;background:linear-gradient(135deg,#ec705d,#b85e88)}.bw-score-caption{min-width:0;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:clamp(4px,.8vw,12px);padding:clamp(4px,.6vw,10px) 2px 0;font-size:clamp(12px,1.3vw,21px);color:var(--ink)}.bw-score-rank{font:800 1.25em Georgia,serif;color:var(--coral)}.bw-score-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}.bw-score-points{white-space:nowrap;color:#8d6023;font-variant-numeric:tabular-nums}
+.bw-remix-note{width:fit-content;max-width:100%;margin-top:clamp(12px,2vh,22px)!important;padding:10px 16px;border-radius:9px;background:#e5f2eb;border:1px solid #bad8c8;color:#235f52;font-size:clamp(14px,1.3vw,20px);font-weight:800;line-height:1.3}
 @media(max-height:760px){.bw-score-scene h1{font-size:clamp(27px,4vw,48px)}.bw-score-caption{font-size:clamp(10px,1.1vw,16px)}.bw-score-polaroids{gap:8px;padding:6px}.bw-score-polaroid{padding:6px}}
 `;
 
@@ -217,7 +218,7 @@ export function mountBlickwinkelHost(rootInput: unknown, source: HostGameStateSo
     } else if (stage === "avatar") {
       const intro = el("section", "bw-vote-wait");
       intro.append(el("p", "bw-kicker", en ? "YOUR CHARACTER" : "EUER CHARAKTER"),
-        el("h1", undefined, en ? "One selfie for the whole game" : "Ein Selfie für das ganze Spiel"),
+        el("h1", undefined, en ? "Your first character selfie" : "Euer erstes Charakterselfie"),
         el("p", undefined, en ? "Take your character photo on your phone." : "Macht euer Charakterfoto auf dem Handy."),
         el("p", "bw-progress", `${state.submittedCount ?? 0} / ${state.playerNames?.length ?? 0}`));
       body.append(intro);
@@ -225,6 +226,11 @@ export function mountBlickwinkelHost(rootInput: unknown, source: HostGameStateSo
       const main = el("div", "bw-main");
       const kind = state?.round?.kind;
       main.append(el("p", "bw-kicker", en ? "YOUR GROUP, YOUR ANSWERS" : "EURE RUNDE, EURE ANTWORTEN"), el("h1", "bw-prompt", state?.round?.prompt ?? ""), el("span", "bw-kind", `${kindIcon(kind)}  ${kindLabel(kind, en)}`));
+      if (state?.round?.useOtherAvatar || state?.round?.useOwnAvatar) {
+        main.append(el("p", "bw-remix-note", en
+          ? "After the vote, your edited selfie becomes that person's new character photo."
+          : "Nach der Abstimmung wird das bearbeitete Selfie zum neuen Charakterbild der Person."));
+      }
       const side = el("aside", "bw-side");
       const clock = el("div", "bw-clock"); clock.append(el("strong", undefined, "—"), el("span", undefined, en ? "SECONDS" : "SEKUNDEN"));
       const info = el("div"); const count = el("p", "bw-progress", `${state?.submittedCount ?? 0} / ${state?.playerNames?.length ?? 0} ${en ? "in" : "abgegeben"}`);

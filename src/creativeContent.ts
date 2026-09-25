@@ -7,9 +7,11 @@ export type CreativeTask = {
   prompt: string;
   maxStrokes?: 1 | 2;
   useOtherAvatar?: boolean;
+  useOwnAvatar?: boolean;
 };
 
 type TaskRow = readonly [CreativeTask["kind"], string, string, string, string];
+const ownAvatarIds = new Set(["draw-crown", "draw-comic", "draw-weather", "draw-speech"]);
 
 // Each pair is authored for this game; keep ids language independent so rounds
 // remain stable when a room changes its display language.
@@ -60,6 +62,18 @@ const rows: readonly TaskRow[] = [
   ["draw", "Foto-Remix", "Malt eurem Selfie eine Sprechblase mit einem kurzen, freundlichen Satz.", "Add a speech bubble with a short, friendly line to your selfie.", "draw-speech"],
   ["draw", "Kritzelei", "Zeichnet ein neues Fantasie-Logo für eure Gruppe, nur aus Formen und Linien.", "Draw a new imaginary logo for your group using only shapes and lines.", "draw-logo"],
   ["draw", "Foto-Remix", "Ihr bekommt das Selfie einer anderen Person. Verwandelt es mit einer Zeichnung in eine Filmfigur.", "You get another player's selfie. Turn it into a movie character with a drawing.", "draw-other-selfie"],
+  ["draw", "Foto-Remix", "Verwandelt das Charakterselfie einer anderen Person in eine Weltraumforscherin oder einen Weltraumforscher.", "Turn another player's character selfie into a space explorer.", "draw-other-space"],
+  ["draw", "Foto-Remix", "Macht aus dem Charakterselfie einer anderen Person den Star eines fantasievollen Albumcovers.", "Turn another player's character selfie into the star of an imaginary album cover.", "draw-other-album"],
+  ["draw", "Foto-Remix", "Verpasst dem Charakterselfie einer anderen Person einen Detektiv-Look für einen rätselhaften Fall.", "Give another player's character selfie a detective look for a mysterious case.", "draw-other-detective"],
+  ["draw", "Foto-Remix", "Gestaltet das Charakterselfie einer anderen Person als Heldin oder Held eines selbst erfundenen Spiels.", "Redesign another player's character selfie as the hero of a game you invent.", "draw-other-game-hero"],
+  ["draw", "Foto-Remix", "Macht aus dem Charakterselfie einer anderen Person eine Figur aus einem verrückten Märchen.", "Turn another player's character selfie into a character from a silly fairy tale.", "draw-other-fairy-tale"],
+  ["draw", "Foto-Remix", "Verwandelt das Charakterselfie einer anderen Person in eine Zeitreisende oder einen Zeitreisenden.", "Turn another player's character selfie into a time traveller.", "draw-other-time-travel"],
+  ["draw", "Foto-Remix", "Gestaltet euer Charakterselfie als Entdeckerin oder Entdecker eines Fantasieorts.", "Redesign your own character selfie as the explorer of an imaginary place.", "draw-own-explorer"],
+  ["draw", "Foto-Remix", "Macht aus eurem Charakterselfie ein farbenfrohes Plakat für einen erfundenen Feiertag.", "Turn your own character selfie into a colourful poster for an invented holiday.", "draw-own-holiday"],
+  ["draw", "Foto-Remix", "Verwandelt euer Charakterselfie in das Maskottchen eures Spieleabends.", "Turn your own character selfie into your game night's mascot.", "draw-own-mascot"],
+  ["draw", "Foto-Remix", "Gestaltet euer Charakterselfie als Kapitänin oder Kapitän eines fliegenden Schiffs.", "Redesign your own character selfie as the captain of a flying ship.", "draw-own-captain"],
+  ["draw", "Foto-Remix", "Macht aus eurem Charakterselfie eine Figur auf einer fantasievollen Sammelkarte.", "Turn your own character selfie into a character on an imaginary trading card.", "draw-own-card"],
+  ["draw", "Foto-Remix", "Gestaltet euer Charakterselfie als Wetterfee oder Wetterzauberer mit eigenem Wettersymbol.", "Redesign your own character selfie as a weather wizard with a unique weather symbol.", "draw-own-weather"],
   ["draw", "Ein Strich", "Zeichnet mit genau einem Strich ein völlig neues Haustier für eure Gruppe.", "Draw a brand-new group pet using exactly one stroke.", "draw-one-stroke"],
   ["draw", "Zwei Striche", "Zeichnet mit höchstens zwei Strichen eine lustige neue Frisur.", "Draw a funny new hairstyle using at most two strokes.", "draw-two-strokes"],
 ];
@@ -73,6 +87,7 @@ export function getCreativeTasks(language: SupportedLanguage): CreativeTask[] {
     prompt: english ? en : de,
     ...(id === "draw-one-stroke" ? { maxStrokes: 1 as const } : {}),
     ...(id === "draw-two-strokes" ? { maxStrokes: 2 as const } : {}),
-    ...(id === "draw-other-selfie" ? { useOtherAvatar: true } : {}),
+    ...(id.startsWith("draw-other-") ? { useOtherAvatar: true } : {}),
+    ...(id.startsWith("draw-own-") || ownAvatarIds.has(id) ? { useOwnAvatar: true } : {}),
   }));
 }
