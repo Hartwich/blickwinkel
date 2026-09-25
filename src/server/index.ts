@@ -332,7 +332,11 @@ export const serverGame: ServerGame<BlickwinkelState, BlickwinkelInput, Blickwin
       if (state.showcaseIndex + 1 < state.entries.length) {
         return stageState({ ...state, showcaseIndex: state.showcaseIndex + 1 }, "showcase", context, showcaseMs);
       }
-      return stageState(state, "gallery", context, galleryMs);
+      if (state.round?.kind === "pick" || state.entries.length === 0) {
+        return stageState(state, "gallery", context, galleryMs);
+      }
+      if (state.entries.length === 1) return revealCreative(state, context);
+      return stageState({ ...state, submittedCount: 0 }, "vote", context, null);
     }
     if (state.stage === "gallery") {
       if (state.round?.kind === "pick") return stageState(state, "scoreboard", context, scoreboardMs);
