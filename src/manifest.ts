@@ -22,14 +22,14 @@ export const blickwinkelManifest = {
   ownsScreens: ["round_intro", "result"],
   visual: { accent: "#e76f51", icon: "chat", eyebrow: "Party stories" },
   audio: {
-    track: { profile: "gentle", bpm: 96, rootMidi: 60, masterGain: 0.1 },
+    track: { profile: "gentle", bpm: 96, rootMidi: 60, masterGain: 0.1, crossfadeSeconds: 1.5 },
     trackByStage: {
-      vote: { profile: "mystery", bpm: 104, rootMidi: 60, masterGain: 0.09 },
-      showcase: { profile: "sugarCountry", bpm: 108, rootMidi: 60, masterGain: 0.11 },
-      gallery: { profile: "sugarCountry", bpm: 108, rootMidi: 60, masterGain: 0.11 },
-      winner: { profile: "sugarCountry", bpm: 118, rootMidi: 67, masterGain: 0.13 },
-      scoreboard: { profile: "sugarCountry", bpm: 108, rootMidi: 60, masterGain: 0.11 },
-      finished: { profile: "sugarCountry", bpm: 94, rootMidi: 60, masterGain: 0.1 }
+      vote: { profile: "mystery", bpm: 104, rootMidi: 60, masterGain: 0.09, crossfadeSeconds: 1.5 },
+      showcase: { profile: "sugarCountry", bpm: 108, rootMidi: 60, masterGain: 0.11, crossfadeSeconds: 1.5 },
+      gallery: { profile: "sugarCountry", bpm: 108, rootMidi: 60, masterGain: 0.11, crossfadeSeconds: 1.5 },
+      winner: { profile: "sugarCountry", bpm: 118, rootMidi: 67, masterGain: 0.13, crossfadeSeconds: 1.5 },
+      scoreboard: { profile: "sugarCountry", bpm: 108, rootMidi: 60, masterGain: 0.11, crossfadeSeconds: 1.5 },
+      finished: { profile: "sugarCountry", bpm: 94, rootMidi: 60, masterGain: 0.1, crossfadeSeconds: 1.5 }
     }
   },
   hostChrome: { hud: false, roomCode: false },

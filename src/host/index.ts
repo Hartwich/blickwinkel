@@ -14,10 +14,16 @@ interface HostGameState {
   entries: HostEntry[]; winnerIds: string[]; roundScores: Record<string, number>; showcaseIndex: number;
 }
 
+const COIN_COUNT = 7;
+const COIN_DELAY = .45;
+const COIN_STAGGER = .12;
+const COIN_DURATION = 1.15;
+const COIN_LANDING = COIN_DURATION * .78;
+
 const styleText = `
 .bw-host{--paper:#f5eddf;--ink:#30263c;--soft:#736878;--line:#dfd2c0;--coral:#ec705d;--yellow:#f2bd4b;--teal:#559b8d;position:absolute;inset:0;overflow:hidden;box-sizing:border-box;background:radial-gradient(ellipse at 80% 12%,#fff9 0,transparent 32%),var(--paper);color:var(--ink);font-family:Inter,"Avenir Next",system-ui,sans-serif;padding:clamp(22px,4vw,58px);isolation:isolate}
 .bw-host *{box-sizing:border-box}.bw-host:before{content:"";position:absolute;inset:0;z-index:-1;opacity:.16;pointer-events:none;background-image:radial-gradient(#806b5828 .7px,transparent .7px);background-size:7px 7px}.bw-host h1,.bw-host h2,.bw-host p{margin:0}.bw-shell{height:100%;max-width:1600px;margin:auto;display:grid;grid-template-rows:auto 1fr auto;gap:clamp(18px,3vh,36px)}
-.bw-top{display:flex;align-items:center;justify-content:space-between;gap:24px}.bw-brand{display:flex;align-items:center;gap:14px;font-size:clamp(15px,1.5vw,22px);font-weight:900;letter-spacing:.11em}.bw-mark{width:38px;height:38px;display:grid;place-items:center;border-radius:50%;background:var(--coral);color:#fff;font-family:Georgia,serif;font-size:25px;transform:rotate(-8deg);box-shadow:5px 5px 0 #30263c18}.bw-round{font-size:clamp(13px,1.2vw,18px);font-weight:800;color:var(--soft);letter-spacing:.08em;text-transform:uppercase}.bw-round b{color:var(--ink);margin-left:10px}.bw-body{min-height:0;display:grid;grid-template-columns:minmax(0,1.5fr) minmax(250px,.62fr);gap:clamp(25px,5vw,78px);align-items:center}.bw-main{min-width:0;animation:bw-rise .55s cubic-bezier(.2,.8,.2,1) both}.bw-kicker{display:flex;align-items:center;gap:10px;margin-bottom:clamp(15px,2.5vh,28px);font-size:clamp(12px,1.05vw,15px);font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:var(--coral)}.bw-kicker:before{content:"";width:27px;height:3px;border-radius:3px;background:currentColor}.bw-prompt{max-width:1050px;font-family:Georgia,"Times New Roman",serif;font-size:clamp(38px,6vw,88px);line-height:1.04;letter-spacing:-.035em;text-wrap:balance}.bw-kind{margin-top:24px;display:inline-flex;align-items:center;gap:10px;border-bottom:2px solid var(--yellow);padding:0 2px 7px;font-size:clamp(14px,1.4vw,20px);font-weight:800;color:var(--soft)}.bw-kind i{font-style:normal;color:var(--teal);font-size:1.3em}
+.bw-top{display:flex;align-items:center;justify-content:space-between;gap:24px}.bw-brand{display:flex;align-items:center;gap:14px;font-size:clamp(15px,1.5vw,22px);font-weight:900;letter-spacing:.11em}.bw-mark{width:38px;height:38px;display:grid;place-items:center;border-radius:50%;background:var(--coral);color:#fff;font-family:Georgia,serif;font-size:25px;transform:rotate(-8deg);box-shadow:5px 5px 0 #30263c18}.bw-round{font-size:clamp(13px,1.2vw,18px);font-weight:800;color:var(--soft);letter-spacing:.08em;text-transform:uppercase}.bw-round b{color:var(--ink);margin-left:10px}.bw-body{min-height:0;display:grid;grid-template-columns:minmax(0,1.5fr) minmax(250px,.62fr);gap:clamp(25px,5vw,78px);align-items:center}.bw-main{min-width:0;animation:bw-rise .55s cubic-bezier(.2,.8,.2,1) both}.bw-kicker{display:flex;align-items:center;gap:10px;margin-bottom:clamp(15px,2.5vh,28px);font-size:clamp(12px,1.05vw,15px);font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:var(--coral)}.bw-kicker:before{content:"";width:27px;height:3px;border-radius:3px;background:currentColor}.bw-prompt{max-width:1050px;font-family:Georgia,"Times New Roman",serif;font-size:clamp(38px,6vw,88px);line-height:1.04;letter-spacing:-.035em;text-wrap:balance}
 .bw-side{display:grid;gap:20px;align-content:center}.bw-clock{width:min(260px,18vw);aspect-ratio:1;border-radius:50%;margin:0 auto;display:grid;place-items:center;position:relative;background:conic-gradient(var(--coral) var(--progress,100%),#dfd2c0 0);box-shadow:0 20px 50px #382a2415;animation:bw-pop .5s .1s cubic-bezier(.2,.8,.2,1) both}.bw-clock:before{content:"";position:absolute;inset:9px;border-radius:inherit;background:var(--paper)}.bw-clock strong{z-index:1;font-family:Georgia,serif;font-size:clamp(40px,5vw,72px);font-variant-numeric:tabular-nums}.bw-clock span{position:absolute;z-index:1;transform:translateY(48px);font-size:12px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:var(--soft)}.bw-progress{font-size:clamp(16px,1.5vw,22px);font-weight:850;text-align:center}.bw-progressbar{height:8px;background:#dfd2c0;border-radius:8px;overflow:hidden}.bw-progressbar i{height:100%;width:var(--done,0%);display:block;border-radius:inherit;background:linear-gradient(90deg,var(--teal),#86bda9);transition:width .5s ease}
 .bw-roster{border-top:1px solid var(--line);padding:16px 96px 0 0;display:flex;flex-wrap:wrap;gap:9px;justify-content:flex-end}.bw-player{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:99px;background:#fff8;border:1px solid var(--line);font-size:clamp(13px,1.1vw,16px);font-weight:750;animation:bw-rise .4s both;animation-delay:calc(var(--i)*45ms)}.bw-player i{width:9px;height:9px;border-radius:50%;background:var(--teal)}.bw-footer{display:flex;justify-content:space-between;align-items:center;padding-right:96px;color:var(--soft);font-size:clamp(12px,1vw,15px);font-weight:700}.bw-footer strong{color:var(--ink);letter-spacing:.12em}
 .bw-votes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(270px,100%),1fr));gap:clamp(14px,2vw,26px);align-content:center;max-height:100%;overflow:auto;padding:8px}.bw-entry{position:relative;min-height:180px;max-height:35vh;display:flex;flex-direction:column;overflow:hidden;border:8px solid #fff;border-bottom-width:28px;border-radius:5px;background:#fff;box-shadow:0 14px 30px #392b2018;transform:rotate(var(--tilt));animation:bw-photo .65s cubic-bezier(.16,.75,.25,1) both;animation-delay:calc(var(--i)*90ms)}.bw-entry img{width:100%;height:100%;min-height:160px;object-fit:cover;background:#ede4d8}.bw-entry__text{padding:18px;min-height:130px;display:grid;place-items:center;background:linear-gradient(135deg,#fff,#fff7e8);font-family:Georgia,serif;font-size:clamp(19px,2vw,30px);text-align:center;line-height:1.2;overflow:auto}.bw-entry__label{position:absolute;left:12px;bottom:5px;color:#544a50;font-size:14px;font-weight:800}.bw-votes.is-pick{display:flex;flex-wrap:wrap;justify-content:center;gap:18px}.bw-votes.is-pick .bw-entry{width:min(260px,24%);min-width:175px;min-height:110px;max-height:none;align-items:center;justify-content:center;border:1px solid var(--line);border-bottom:5px solid var(--yellow);border-radius:12px;background:#fff9;box-shadow:0 8px 18px #392b2010}.bw-votes.is-pick .bw-entry__text{min-height:auto;background:none;font-family:inherit;font-size:clamp(20px,2vw,30px);font-weight:850}.bw-votes.is-pick .bw-entry__label{display:none}.bw-vote-count{position:absolute;right:10px;top:10px;padding:5px 9px;border-radius:99px;background:var(--coral);color:white;font-size:13px;font-weight:900}
@@ -38,8 +44,8 @@ const styleText = `
 .bw-vote-card.is-image{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);gap:clamp(4px,.6vw,10px)}.bw-vote-image-name{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;color:var(--ink);font-size:clamp(12px,1.25vw,20px);line-height:1.1}.bw-vote-card.is-image .bw-vote-answer{border-top:1px solid var(--line);padding-top:clamp(4px,.5vw,8px)}
 .bw-vote-grid.is-reveal .bw-vote-card:not(.is-winner){opacity:.48;filter:saturate(.65)}.bw-vote-card.is-winner{z-index:1;border-color:#e4ae35;box-shadow:0 0 0 5px #f2bd4b7a,0 18px 38px #9c71343d;animation:bw-winner-card .7s cubic-bezier(.2,.8,.2,1) both}.bw-winner-seal{position:absolute;top:-10px;right:-8px;z-index:3;padding:6px 11px;border-radius:99px;background:#e5aa2e;color:#36231b;box-shadow:0 5px 13px #79541244;font-size:clamp(10px,1vw,15px);font-weight:950;letter-spacing:.08em;transform:rotate(5deg)}.bw-firework{position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden}.bw-spark{position:absolute;left:50%;top:50%;width:clamp(6px,.7vw,11px);height:clamp(6px,.7vw,11px);border-radius:2px;background:var(--spark-color);box-shadow:0 0 12px var(--spark-color);animation:bw-spark .95s var(--delay) cubic-bezier(.12,.7,.25,1) both}@keyframes bw-winner-card{0%{opacity:.6;transform:scale(.94)}55%{opacity:1;transform:scale(1.035)}100%{opacity:1;transform:scale(1)}}@keyframes bw-spark{0%{opacity:0;transform:translate(-50%,-50%) scale(.2) rotate(0)}16%{opacity:1}100%{opacity:0;transform:translate(calc(-50% + var(--x)),calc(-50% + var(--y))) scale(.3) rotate(220deg)}}
 .bw-vote-wait.is-winner-scene{width:100%;grid-template-rows:auto auto minmax(0,1fr);gap:clamp(6px,1vh,12px);overflow:hidden}.bw-vote-wait.is-winner-scene h1{font-size:clamp(30px,4vw,56px)}.bw-vote-wait.is-winner-scene>.bw-kicker{color:#b47b1d}
-.bw-score-polaroids{height:min(100%,var(--board-height,560px));align-self:center;align-content:center;gap:clamp(8px,1vw,18px)}.bw-score-polaroids[data-rows="1"]{transform:translateY(clamp(18px,5vh,55px))}.bw-score-polaroid{position:relative;grid-template-rows:minmax(0,1fr) auto;overflow:hidden;animation:bw-polaroid-in .5s both;animation-delay:calc(var(--i)*55ms)}.bw-score-polaroid.is-gold{--medal:#f6df98;animation:bw-polaroid-in .5s both,bw-medal-reveal .65s 2.1s forwards}.bw-score-polaroid.is-silver{--medal:#dce4eb;animation:bw-polaroid-in .5s both,bw-medal-reveal .65s 2.1s forwards}.bw-score-polaroid.is-bronze{--medal:#e9bea0;animation:bw-polaroid-in .5s both,bw-medal-reveal .65s 2.1s forwards}.bw-score-polaroid.is-gold,.bw-score-polaroid.is-silver,.bw-score-polaroid.is-bronze{animation-delay:calc(var(--i)*55ms),2.1s}.bw-score-photo{object-position:center 35%}.bw-score-caption{z-index:2}.bw-coins{position:absolute;inset:0 0 28px;z-index:3;pointer-events:none;overflow:hidden}.bw-coin{position:absolute;top:-25%;width:clamp(18px,2vw,30px);height:clamp(18px,2vw,30px);display:grid;place-items:center;border:2px solid #b77b16;border-radius:50%;color:#a76c0d;background:radial-gradient(circle at 30% 25%,#fff2ac,#f4c44a 55%,#c98e26);box-shadow:0 3px 5px #66481955;font-size:clamp(9px,1vw,15px);animation:bw-coin-fall 1.15s calc(.45s + var(--coin-i)*.12s) ease-in both}@keyframes bw-polaroid-in{from{opacity:0;transform:translateY(20px) rotate(var(--tilt))}to{opacity:1;transform:translateY(0) rotate(var(--tilt))}}@keyframes bw-coin-fall{0%{opacity:0;top:-25%;transform:rotate(-45deg) scale(.7)}18%{opacity:1}78%{opacity:1;top:48%;transform:rotate(30deg) scale(1)}100%{opacity:0;top:67%;transform:rotate(55deg) scale(.8)}}@keyframes bw-medal-reveal{from{background:#fffdf8}to{background:var(--medal)}}
-.bw-vote-wait.is-vote,.bw-vote-wait.is-winner-scene,.bw-score-scene{height:100%;align-self:stretch}.bw-vote-grid.is-dense .bw-vote-text{font-size:clamp(13px,1.35vw,21px)}.bw-score-polaroid.is-gold,.bw-score-polaroid.is-silver,.bw-score-polaroid.is-bronze{animation-delay:calc(var(--i)*55ms),2.6s}
+.bw-score-polaroids{height:min(100%,var(--board-height,560px));align-self:center;align-content:center;gap:clamp(8px,1vw,18px)}.bw-score-polaroids[data-rows="1"]{transform:translateY(clamp(18px,5vh,55px))}.bw-score-polaroid{position:relative;grid-template-rows:minmax(0,1fr) auto;overflow:hidden;animation:bw-polaroid-in .5s both;animation-delay:calc(var(--i)*55ms)}.bw-score-polaroid.is-gold{--medal:#f6df98;animation:bw-polaroid-in .5s both,bw-medal-reveal .65s 2.1s forwards}.bw-score-polaroid.is-silver{--medal:#dce4eb;animation:bw-polaroid-in .5s both,bw-medal-reveal .65s 2.1s forwards}.bw-score-polaroid.is-bronze{--medal:#e9bea0;animation:bw-polaroid-in .5s both,bw-medal-reveal .65s 2.1s forwards}.bw-score-polaroid.is-gold,.bw-score-polaroid.is-silver,.bw-score-polaroid.is-bronze{animation-delay:calc(var(--i)*55ms),2.1s}.bw-score-photo{object-position:center 35%}.bw-score-caption{z-index:2}.bw-coins{position:absolute;inset:clamp(6px,.8vw,12px) clamp(6px,.8vw,12px) 42px;z-index:3;pointer-events:none;overflow:hidden}.bw-coin{position:absolute;top:var(--coin-top,70%);transform:rotate(var(--coin-tilt,20deg));width:clamp(18px,2vw,30px);height:clamp(18px,2vw,30px);display:grid;place-items:center;border:2px solid #b77b16;border-radius:50%;color:#a76c0d;background:radial-gradient(circle at 30% 25%,#fff2ac,#f4c44a 55%,#c98e26);box-shadow:0 3px 5px #66481955;font-size:clamp(9px,1vw,15px);animation:bw-coin-fall ${COIN_DURATION}s calc(${COIN_DELAY}s + var(--coin-i)*${COIN_STAGGER}s - var(--scene-elapsed,0s)) ease-in both}@keyframes bw-polaroid-in{from{opacity:0;transform:translateY(20px) rotate(var(--tilt))}to{opacity:1;transform:translateY(0) rotate(var(--tilt))}}@keyframes bw-coin-fall{0%{opacity:0;top:-25%;transform:rotate(-45deg) scale(.7)}18%{opacity:1}78%{opacity:1;top:var(--coin-top,70%);transform:translateY(0) rotate(var(--coin-tilt,20deg)) scale(1)}90%{opacity:1;top:var(--coin-top,70%);transform:translateY(-7px) rotate(var(--coin-tilt,20deg)) scale(1)}100%{opacity:1;top:var(--coin-top,70%);transform:translateY(0) rotate(var(--coin-tilt,20deg)) scale(1)}}@keyframes bw-medal-reveal{from{background:#fffdf8}to{background:var(--medal)}}
+.bw-vote-wait.is-vote,.bw-vote-wait.is-winner-scene,.bw-score-scene{height:100%;align-self:stretch}.bw-vote-grid.is-dense .bw-vote-text{font-size:clamp(13px,1.35vw,21px)}.bw-score-polaroid.is-gold,.bw-score-polaroid.is-silver,.bw-score-polaroid.is-bronze{animation-delay:calc(var(--i)*55ms - var(--scene-elapsed,0s)),calc(2.6s - var(--scene-elapsed,0s))}
 @media(max-height:760px){.bw-score-polaroids[data-rows="1"]{transform:translateY(16px)}.bw-vote-card{padding:6px}.bw-vote-name{font-size:clamp(10px,1vw,15px)}}@media(max-width:850px){.bw-vote-card{grid-template-columns:minmax(55px,27%) minmax(0,1fr)}.bw-vote-grid{gap:7px}.bw-score-caption{font-size:clamp(10px,1vw,15px)}}@media(prefers-reduced-motion:reduce){.bw-vote-card.is-winner,.bw-spark,.bw-coin,.bw-score-polaroid,.bw-score-polaroid.is-gold,.bw-score-polaroid.is-silver,.bw-score-polaroid.is-bronze{animation:none!important}.bw-score-polaroid.is-gold,.bw-score-polaroid.is-silver,.bw-score-polaroid.is-bronze{background:var(--medal)}}
 `;
 
@@ -167,10 +173,12 @@ function scoreboardNode(state: Partial<HostGameState>, en: boolean, final = fals
     } else card.append(el("div", "bw-score-photo bw-score-photo-fallback", player.name.slice(0, 1).toUpperCase()));
     if (roundWinners.has(player.id)) {
       const coins = el("div", "bw-coins"); coins.setAttribute("aria-hidden", "true");
-      for (let coinIndex = 0; coinIndex < 7; coinIndex += 1) {
+      for (let coinIndex = 0; coinIndex < COIN_COUNT; coinIndex += 1) {
         const coin = el("span", "bw-coin", "★");
         coin.style.setProperty("--coin-i", String(coinIndex));
-        coin.style.left = `${10 + coinIndex * 12}%`;
+        coin.style.setProperty("--coin-top", `${64 + coinIndex % 3 * 6}%`);
+        coin.style.setProperty("--coin-tilt", `${coinIndex % 2 ? -18 : 22}deg`);
+        coin.style.left = `${8 + coinIndex * 12}%`;
         coins.append(coin);
       }
       card.append(coins);
@@ -193,35 +201,71 @@ export function mountBlickwinkelHost(rootInput: unknown, source: HostGameStateSo
   let current: HostStateLike | null = null;
   let lastRenderKey = "";
   let lastCueKey = "";
+  let animationSceneKey = "";
+  let sceneStartedAt = 0;
   let audio: AudioContext | null = null;
   let ticker = 0;
-  const playCue = (key: string, winner = false) => {
+  const activeTones = new Set<OscillatorNode>();
+  const playCue = (key: string, cue: "answer" | "winner" | "coins" | "gallery" = "answer") => {
     if (key === lastCueKey) return;
     lastCueKey = key;
     try {
       audio ??= new AudioContext();
-      if (audio.state !== "running") void audio.resume();
+      if (audio.state !== "running") void audio.resume().catch(() => {});
       const at = audio.currentTime;
-      (winner ? [523.25, 659.25, 783.99, 1046.5] : [523.25, 659.25]).forEach((frequency, index) => {
-        const tone = audio!.createOscillator();
+      const tone = (frequency: number, delay: number, duration: number, volume: number,
+        type: OscillatorType = "sine", endFrequency = frequency) => {
+        const oscillator = audio!.createOscillator();
         const gain = audio!.createGain();
-        tone.type = winner ? "triangle" : "sine"; tone.frequency.value = frequency;
-        gain.gain.setValueAtTime(0.0001, at + index * .12);
-        gain.gain.exponentialRampToValueAtTime(winner ? .075 : .055, at + index * .12 + .015);
-        gain.gain.exponentialRampToValueAtTime(.0001, at + index * .12 + .27);
-        tone.connect(gain).connect(audio!.destination);
-        tone.start(at + index * .12); tone.stop(at + index * .12 + .28);
-      });
+        const start = at + delay;
+        oscillator.type = type;
+        oscillator.frequency.setValueAtTime(frequency, start);
+        oscillator.frequency.exponentialRampToValueAtTime(endFrequency, start + duration);
+        gain.gain.setValueAtTime(.0001, start);
+        gain.gain.exponentialRampToValueAtTime(volume, start + .008);
+        gain.gain.exponentialRampToValueAtTime(.0001, start + duration);
+        oscillator.connect(gain).connect(audio!.destination);
+        activeTones.add(oscillator);
+        oscillator.onended = () => { activeTones.delete(oscillator); oscillator.disconnect(); gain.disconnect(); };
+        oscillator.start(start); oscillator.stop(start + duration + .01);
+      };
+      if (cue === "coins") {
+        for (let index = 0; index < COIN_COUNT; index += 1) {
+          const landing = COIN_DELAY + index * COIN_STAGGER + COIN_LANDING;
+          // Two bright partials give each landing a small metallic clink.
+          tone(1568 + index % 3 * 110, landing, .16, .055, "triangle");
+          tone(3136 + index % 3 * 220, landing + .012, .1, .018);
+        }
+        tone(1046.5, 2.6, .35, .05);
+        tone(1318.5, 2.69, .4, .04);
+      } else if (cue === "winner") {
+        [523.25, 659.25, 783.99, 1046.5].forEach((frequency, index) => tone(frequency, index * .12, .32, .075, "triangle"));
+      } else {
+        // A soft upward sweep accompanies the card, followed by a clear bell.
+        tone(180, 0, .16, .045, "sine", 720);
+        tone(783.99, .1, .25, .07, "triangle");
+        tone(cue === "gallery" ? 1318.5 : 1046.5, .19, .38, .045);
+      }
     } catch { /* The host can still show the animation if audio is unavailable. */ }
   };
   const draw = (appState: HostStateLike | null) => {
     current = appState;
     const state = (appState?.game?.state ?? {}) as Partial<HostGameState>;
+    const stage = state.stage ?? "finished";
     const en = appState?.room?.language === "en";
     const renderKey = `${appState?.game?.updatedAt ?? ""}:${appState?.game?.phase ?? ""}:${state?.stage ?? ""}:${appState?.room?.language ?? "de"}`;
     if (renderKey === lastRenderKey) { updateClock(); return; }
     lastRenderKey = renderKey;
+    const sceneKey = `${stage}:${state.roundIndex}:${state.round?.id}:${state.showcaseIndex}`;
+    if (sceneKey !== animationSceneKey) {
+      animationSceneKey = sceneKey;
+      sceneStartedAt = performance.now();
+      for (const tone of activeTones) tone.stop();
+      activeTones.clear();
+      lastCueKey = "";
+    }
     const shell = el("main", "bw-host");
+    shell.style.setProperty("--scene-elapsed", `${(performance.now() - sceneStartedAt) / 1000}s`);
     const layout = el("div", "bw-shell");
     const top = el("header", "bw-top");
     const brand = el("div", "bw-brand");
@@ -232,7 +276,6 @@ export function mountBlickwinkelHost(rootInput: unknown, source: HostGameStateSo
     round.append(roundNumber);
     top.append(brand, round);
     const body = el("section", "bw-body");
-    const stage = state?.stage ?? "finished";
     if (!state?.round && stage !== "finished") {
       const intro = el("div", "bw-complete");
       intro.append(el("h1", undefined, en ? "Your people. Your perspective." : "Eure Leute. Euer Blickwinkel."),
@@ -269,7 +312,7 @@ export function mountBlickwinkelHost(rootInput: unknown, source: HostGameStateSo
       (state.entries ?? []).forEach((entry, index) => grid.append(entryCard(entry, en, index,
         state.playerNames?.find(({ id }) => id === entry.authorId)?.avatar)));
       gallery.append(grid); body.append(gallery);
-      playCue(`gallery:${state.roundIndex}`);
+      playCue(`gallery:${state.roundIndex}`, "gallery");
     } else if (stage === "vote") {
       const wait = el("section", "bw-vote-wait is-vote");
       wait.append(el("p", "bw-kicker", en ? "YOUR VOTE" : "EURE STIMME"),
@@ -283,10 +326,10 @@ export function mountBlickwinkelHost(rootInput: unknown, source: HostGameStateSo
         el("h1", undefined, winnerCount === 0 ? (en ? "No entry this time" : "Diesmal kein Ergebnis") : winnerCount > 1 ? (en ? "The winning entries" : "Diese Ergebnisse gewinnen") : (en ? "The winning entry" : "Dieses Ergebnis gewinnt")),
         voteGrid(state, en, true));
       body.append(reveal);
-      if (winnerCount) playCue(`winner:${state.roundIndex}`, true);
+      if (winnerCount) playCue(`winner:${state.roundIndex}`, "winner");
     } else if (stage === "scoreboard") {
       body.append(scoreboardNode(state, en));
-      playCue(`scoreboard:${state.roundIndex}`);
+      if (roundWinnerPlayers(state).size) playCue(`scoreboard:${state.roundIndex}`, "coins");
     } else if (stage === "countdown") {
       const next = el("section", "bw-vote-wait");
       next.append(el("p", "bw-kicker", en ? "NEXT TASK" : "NÄCHSTE AUFGABE"), el("h1", undefined, (state.roundIndex ?? 0) < 0 ? (en ? "Here we go!" : "Los geht’s!") : (en ? "Ready for the next one?" : "Bereit für die nächste Aufgabe?")));
@@ -301,8 +344,7 @@ export function mountBlickwinkelHost(rootInput: unknown, source: HostGameStateSo
       body.append(intro);
     } else {
       const main = el("div", "bw-main");
-      const kind = state?.round?.kind;
-      main.append(el("p", "bw-kicker", en ? "YOUR GROUP, YOUR ANSWERS" : "EURE RUNDE, EURE ANTWORTEN"), el("h1", "bw-prompt", state?.round?.prompt ?? ""), el("span", "bw-kind", `${kindIcon(kind)}  ${kindLabel(kind, en)}`));
+      main.append(el("p", "bw-kicker", en ? "YOUR GROUP, YOUR ANSWERS" : "EURE RUNDE, EURE ANTWORTEN"), el("h1", "bw-prompt", state?.round?.prompt ?? ""));
       if (state?.round?.useOtherAvatar || state?.round?.useOwnAvatar) {
         main.append(el("p", "bw-remix-note", en
           ? "After the vote, your edited selfie becomes that person's new character photo."
@@ -337,14 +379,8 @@ export function mountBlickwinkelHost(rootInput: unknown, source: HostGameStateSo
   const unsubscribe = typedSource.subscribe(draw);
   const initial = typedSource.getState(); if (initial) draw(initial);
   ticker = window.setInterval(updateClock, 250);
-  return () => { unsubscribe(); window.clearInterval(ticker); if (audio) void audio.close(); root.replaceChildren(); root.className = ""; };
+  return () => { unsubscribe(); window.clearInterval(ticker); if (audio) void audio.close().catch(() => {}); root.replaceChildren(); root.className = ""; };
 }
-
-function kindLabel(kind: string | undefined, en: boolean): string {
-  const labels: Record<string, [string, string]> = { pick: ["Wer passt am besten?", "Who fits best?"], text: ["Schreibt eure Antwort", "Write your answer"], photo: ["Macht ein Foto", "Take a photo"], draw: ["Zeichnet eure Antwort", "Draw your answer"] };
-  return labels[kind ?? ""]?.[en ? 1 : 0] ?? (en ? "Your turn" : "Eure Aufgabe");
-}
-function kindIcon(kind: string | undefined): string { return ({ pick: "◎", text: "✎", photo: "▣", draw: "✦" } as Record<string, string>)[kind ?? ""] ?? "✦"; }
 
 export const hostGame = {
   id: blickwinkelManifest.id,
