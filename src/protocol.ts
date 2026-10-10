@@ -10,6 +10,9 @@ export interface BlickwinkelRound {
   maxStrokes?: 1 | 2;
   useOtherAvatar?: boolean;
   useOwnAvatar?: boolean;
+  requirePhoto?: boolean;
+  useRoundPhoto?: boolean;
+  adultOnly?: boolean;
 }
 
 interface BlickwinkelTaskInput extends PlayerInput {
@@ -73,11 +76,13 @@ export interface BlickwinkelState extends BaseRoundState {
   winnerIds: string[];
   avatarsByPlayer: Record<string, string>;
   avatarTargetByPlayer: Record<string, string>;
+  completedPhotosByPlayer: Record<string, string>;
+  assignedPhotosByPlayer: Record<string, string>;
   showcaseIndex: number;
 }
 
 export interface BlickwinkelPublicState
-  extends Omit<BlickwinkelState, "submissionsByPlayer" | "ballotsByPlayer" | "entryOwnerById" | "avatarsByPlayer" | "avatarTargetByPlayer"> {
+  extends Omit<BlickwinkelState, "submissionsByPlayer" | "ballotsByPlayer" | "entryOwnerById" | "avatarsByPlayer" | "avatarTargetByPlayer" | "completedPhotosByPlayer" | "assignedPhotosByPlayer"> {
   playerNames: Array<{ id: string; name: string; avatar?: string }>;
 }
 

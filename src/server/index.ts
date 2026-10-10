@@ -25,8 +25,8 @@ const roundKinds: readonly BlickwinkelTaskKind[] = [
 const submitMs: Record<BlickwinkelTaskKind, number> = {
   pick: 25_000,
   text: 70_000,
-  photo: 90_000,
-  draw: 120_000
+  photo: 120_000,
+  draw: 150_000
 };
 const showcaseMs = 3_600;
 const galleryMs = 7_000;
@@ -59,18 +59,32 @@ function shuffle<T>(values: readonly T[], seed: number): T[] {
 
 function chooseRounds(context: ServerGameContext): BlickwinkelRound[] {
   const seed = context.now + context.roundNumber * 7919;
-  const tasks = getCreativeTasks(context.language);
+  const adultEnabled = context.roomSettings.blickwinkelAdultContent === "on";
+  const tasks = getCreativeTasks(context.language, adultEnabled);
+  const questions = getBlickwinkelQuestions(context.language, adultEnabled);
+  const adultPicks = shuffle(questions.filter((task) => task.adultOnly), seed + 7);
+  const adultTexts = shuffle(tasks.filter((task) => task.adultOnly && task.kind === "text"), seed + 8);
   const pools: Record<BlickwinkelTaskKind, BlickwinkelRound[]> = {
-    pick: shuffle(getBlickwinkelQuestions(context.language), seed),
-    text: shuffle(tasks.filter((task) => task.kind === "text"), seed + 1),
+    pick: shuffle(questions.filter((task) => !task.adultOnly), seed),
+    text: shuffle(tasks.filter((task) => task.kind === "text" && !task.adultOnly), seed + 1),
     photo: shuffle(tasks.filter((task) => task.kind === "photo"), seed + 2),
-    draw: shuffle(tasks.filter((task) => task.kind === "draw" && !task.useOtherAvatar && !task.useOwnAvatar && !task.maxStrokes), seed + 3)
+    draw: shuffle(tasks.filter((task) => task.kind === "draw" && task.requirePhoto && !task.useRoundPhoto), seed + 3)
   };
   const otherAvatarDraws = shuffle(tasks.filter((task) => task.useOtherAvatar), seed + 4);
   const ownAvatarDraws = shuffle(tasks.filter((task) => task.useOwnAvatar), seed + 5);
   const limitedDraws = shuffle(tasks.filter((task) => task.maxStrokes), seed + 6);
   let drawIndex = 0;
+  let pickIndex = 0;
+  let textIndex = 0;
   return roundKinds.map((kind) => {
+    if (kind === "pick") {
+      pickIndex += 1;
+      return adultEnabled && pickIndex <= 2 ? adultPicks.shift() : pools.pick.shift();
+    }
+    if (kind === "text") {
+      textIndex += 1;
+      return adultEnabled && textIndex === 1 ? adultTexts.shift() : pools.text.shift();
+    }
     if (kind !== "draw") return pools[kind].shift();
     drawIndex += 1;
     if (drawIndex === 1) return (context.players.length > 1 ? otherAvatarDraws : ownAvatarDraws).shift();
@@ -88,12 +102,28 @@ function avatarTargets(round: BlickwinkelRound, players: ServerGameContext["play
   ]));
 }
 
+function assignCompletedPhotos(state: BlickwinkelState, context: ServerGameContext): Record<string, string> {
+  // Only complete photo tasks supply this pool. Late joiners must also have a photo.
+  if (!context.players.length || context.players.some(({ id }) => !validMedia(state.completedPhotosByPlayer[id]))) return {};
+  const players = shuffle(context.players, context.now + state.roundIndex * 101);
+  // A shuffled cycle uses each photo exactly once, with no self-assignment except solo.
+  return Object.fromEntries(players.map(({ id }, index) => [
+    id, state.completedPhotosByPlayer[players[(index + 1) % players.length]!.id]!
+  ]));
+}
+
 function isKnownPlayer(context: ServerGameContext, playerId: string): boolean {
   return context.players.some((player) => player.id === playerId);
 }
 
 function hasSubmitted(record: Record<string, string>, playerId: string): boolean {
   return Object.prototype.hasOwnProperty.call(record, playerId);
+}
+
+function winnerScores(context: ServerGameContext, playerIds: string[]): Record<string, number> {
+  const winners = new Set(playerIds.filter((id) => isKnownPlayer(context, id)));
+  const points = winners.size ? Math.max(1, Math.round(5 / winners.size)) : 0;
+  return Object.fromEntries(context.players.map(({ id }) => [id, winners.has(id) ? points : 0]));
 }
 
 function stageState(state: BlickwinkelState, stage: BlickwinkelState["stage"], context: ServerGameContext, durationMs: number | null): BlickwinkelState {
@@ -136,11 +166,7 @@ function revealPick(state: BlickwinkelState, context: ServerGameContext): Blickw
   }
   const most = Math.max(0, ...Object.values(counts));
   const winnerIds = most > 0 ? Object.keys(counts).filter((id) => counts[id] === most) : [];
-  const deltas: Record<string, number> = Object.fromEntries(context.players.map(({ id }) => [id, 0]));
-  for (const [voterId, targetId] of Object.entries(state.submissionsByPlayer)) {
-    if (winnerIds.includes(targetId)) deltas[voterId] = (deltas[voterId] ?? 0) + 2;
-    deltas[targetId] = (deltas[targetId] ?? 0) + 1;
-  }
+  const deltas = winnerScores(context, winnerIds);
   const names = new Map(context.players.map(({ id, name }) => [id, name]));
   const entries: BlickwinkelEntry[] = Object.entries(state.submissionsByPlayer).map(([authorId, targetId], index) => ({
     id: `pick-${index}`, label: String.fromCharCode(65 + index),
@@ -188,17 +214,7 @@ function revealCreative(state: BlickwinkelState, context: ServerGameContext): Bl
   const winnerIds = state.entries.length === 1
     ? [state.entries[0]!.id]
     : most > 0 ? Object.keys(counts).filter((id) => counts[id] === most) : [];
-  const deltas: Record<string, number> = Object.fromEntries(context.players.map(({ id }) => [id, 0]));
-  for (const [voterId, entryId] of Object.entries(state.ballotsByPlayer)) {
-    const authorId = state.entryOwnerById[entryId];
-    if (!authorId) continue;
-    deltas[authorId] = (deltas[authorId] ?? 0) + 1;
-    if (winnerIds.includes(entryId)) deltas[voterId] = (deltas[voterId] ?? 0) + 2;
-  }
-  for (const entryId of winnerIds) {
-    const authorId = state.entryOwnerById[entryId];
-    if (authorId) deltas[authorId] = (deltas[authorId] ?? 0) + (state.entries.length === 1 ? 2 : 1);
-  }
+  const deltas = winnerScores(context, winnerIds.map((id) => state.entryOwnerById[id] ?? ""));
   const names = new Map(context.players.map(({ id, name }) => [id, name]));
   const entries = state.entries
     .map((entry) => ({
@@ -220,7 +236,10 @@ function revealCreative(state: BlickwinkelState, context: ServerGameContext): Bl
 }
 
 function completeSubmit(state: BlickwinkelState, context: ServerGameContext): BlickwinkelState {
-  return state.round?.kind === "pick" ? revealPick(state, context) : prepareCreativeShowcase(state, context);
+  const completePhotoTask = state.round?.kind === "photo" && context.players.length > 0 &&
+    context.players.every(({ id }) => validMedia(state.submissionsByPlayer[id]));
+  const next = completePhotoTask ? { ...state, completedPhotosByPlayer: { ...state.submissionsByPlayer } } : state;
+  return next.round?.kind === "pick" ? revealPick(next, context) : prepareCreativeShowcase(next, context);
 }
 
 function toPublic(state: BlickwinkelState, context: ServerGameContext): BlickwinkelPublicState {
@@ -230,6 +249,8 @@ function toPublic(state: BlickwinkelState, context: ServerGameContext): Blickwin
     entryOwnerById: _owners,
     avatarsByPlayer: _avatars,
     avatarTargetByPlayer: _avatarTargets,
+    completedPhotosByPlayer: _completedPhotos,
+    assignedPhotosByPlayer: _assignedPhotos,
     ...publicState
   } = state;
   const rounds = state.rounds.map((round, index) => index <= state.roundIndex ? round : { ...round, prompt: "" });
@@ -266,6 +287,8 @@ export const serverGame: ServerGame<BlickwinkelState, BlickwinkelInput, Blickwin
       winnerIds: [],
       avatarsByPlayer: {},
       avatarTargetByPlayer: {},
+      completedPhotosByPlayer: {},
+      assignedPhotosByPlayer: {},
       showcaseIndex: 0
     };
   },
@@ -290,6 +313,8 @@ export const serverGame: ServerGame<BlickwinkelState, BlickwinkelInput, Blickwin
       winnerIds: [],
       avatarsByPlayer: {},
       avatarTargetByPlayer: {},
+      completedPhotosByPlayer: {},
+      assignedPhotosByPlayer: {},
       showcaseIndex: 0
     }, "playing", context.now, {
       startedAt: context.now,
@@ -387,11 +412,21 @@ export const serverGame: ServerGame<BlickwinkelState, BlickwinkelInput, Blickwin
     if (state.stage !== "countdown") return state;
 
     const nextIndex = state.roundIndex + 1;
-    const round = state.rounds[nextIndex]!;
+    let round = state.rounds[nextIndex]!;
+    let assignedPhotosByPlayer: Record<string, string> = {};
+    // Select this variant only at task start, once a complete earlier photo task exists.
+    if (round.requirePhoto && shuffle([true, false], context.now + nextIndex * 7919)[0]) {
+      const assignments = assignCompletedPhotos(state, context);
+      if (Object.keys(assignments).length === context.players.length && context.players.length > 0) {
+        const remix = shuffle(getCreativeTasks(context.language).filter((task) => task.useRoundPhoto), context.now + nextIndex)[0];
+        if (remix) { round = remix; assignedPhotosByPlayer = assignments; }
+      }
+    }
     return stageState({
       ...state,
       roundIndex: nextIndex,
       round,
+      rounds: state.rounds.map((planned, index) => index === nextIndex ? round : planned),
       submissionsByPlayer: {},
       ballotsByPlayer: {},
       entryOwnerById: {},
@@ -400,6 +435,7 @@ export const serverGame: ServerGame<BlickwinkelState, BlickwinkelInput, Blickwin
       roundScores: {},
       winnerIds: [],
       avatarTargetByPlayer: avatarTargets(round, context.players),
+      assignedPhotosByPlayer,
       showcaseIndex: 0,
       message: context.language === "en" ? "Next task!" : "Die nächste Aufgabe wartet!"
     }, "submit", context, submitMs[round.kind]);
@@ -433,7 +469,8 @@ export const serverGame: ServerGame<BlickwinkelState, BlickwinkelInput, Blickwin
         : hasSubmitted(state.ballotsByPlayer, playerId),
       selectedId,
       ownEntryId: Object.keys(state.entryOwnerById).find((id) => state.entryOwnerById[id] === playerId),
-      basePhoto: state.round?.useOtherAvatar || state.round?.useOwnAvatar
+      basePhoto: state.round?.useRoundPhoto ? state.assignedPhotosByPlayer[playerId]
+        : state.round?.useOtherAvatar || state.round?.useOwnAvatar
         ? state.avatarsByPlayer[state.avatarTargetByPlayer[playerId] ?? ""]
         : undefined
     };

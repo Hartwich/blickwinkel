@@ -11,6 +11,14 @@ export const blickwinkelManifest = {
   controllerLayout: "social_party",
   supportsTeams: false,
   scoreScope: "game",
+  lobbySetup: {
+    title: "Blickwinkel einrichten",
+    fields: [{
+      kind: "toggle", id: "adultContent", settingKey: "blickwinkelAdultContent",
+      label: "Ü18", description: "Zusätzliche Fragen und Textaufgaben über Flirts, Sex und Nachtleben.",
+      onValue: "on", offValue: "off", defaultValue: "off"
+    }]
+  },
   estimatedRoundDurationMs: 900_000,
   roundCompletionMode: "wait_for_ready",
   phaseDurations: {

@@ -87,11 +87,31 @@ const rows: readonly QuestionRow[] = [
   ["Zukunft", "Wessen Idee könnte eines Tages überraschend nützlich sein?", "Whose idea might unexpectedly come in handy one day?"]
 ];
 
-export function getBlickwinkelQuestions(language: SupportedLanguage): BlickwinkelRound[] {
-  return rows.map(([category, de, en], index) => ({
+const adultRows: readonly QuestionRow[] = [
+  ["Ü18", "Wer würde beim ersten Date schon die Zahnbürste für den nächsten Morgen einpacken?", "Who would pack a toothbrush for the next morning before a first date?"],
+  ["Ü18", "Wer hätte die überzeugendste Ausrede, wenn die Eltern ein Sexspielzeug entdecken?", "Who would have the most convincing excuse if their parents found a sex toy?"],
+  ["Ü18", "Wer würde einer Affäre aus Versehen eine Nachricht schicken, die für die beste Freundin gedacht war?", "Who would accidentally send a fling a message meant for their best friend?"],
+  ["Ü18", "Wer könnte am überzeugendsten einen völlig absurden Fetisch erklären?", "Who could explain a completely absurd fetish most convincingly?"],
+  ["Ü18", "Wer würde nach einem One-Night-Stand noch das Frühstück für alle Mitbewohner machen?", "Who would make breakfast for all the flatmates after a one-night stand?"],
+  ["Ü18", "Wer würde in einer Stripshow zuerst selbst auf der Bühne landen?", "Who would be the first to end up on stage at a strip show?"],
+  ["Ü18", "Wer würde einen peinlichen Dirty-Talk-Versuch mit einem Lachanfall beenden?", "Who would end an awkward attempt at dirty talk with a laughing fit?"],
+  ["Ü18", "Wer hätte für ein heimliches Date den kompliziertesten Fluchtplan?", "Who would have the most elaborate escape plan for a secret date?"],
+  ["Ü18", "Wer würde bei einem Flirt aus Versehen den eigenen Ex verkuppeln?", "Who would accidentally set up their own ex while trying to flirt?"],
+  ["Ü18", "Wer würde eine Kondompackung wie ein Luxusprodukt bewerben können?", "Who could advertise a packet of condoms like a luxury product?"],
+  ["Ü18", "Wer würde beim Sex versehentlich den Sprachassistenten aktivieren?", "Who would accidentally activate a voice assistant during sex?"],
+  ["Ü18", "Wer würde nach einer wilden Nacht den Türsteher zum Sonntagsbrunch einladen?", "Who would invite the bouncer to Sunday brunch after a wild night out?"]
+];
+
+export function getBlickwinkelQuestions(language: SupportedLanguage, includeAdult = false): BlickwinkelRound[] {
+  const standard: BlickwinkelRound[] = rows.map(([category, de, en], index) => ({
     id: `blickwinkel-${index + 1}`,
     kind: "pick",
     category,
     prompt: language === "en" ? en : de
   }));
+  if (!includeAdult) return standard;
+  return [...standard, ...adultRows.map(([category, de, en], index): BlickwinkelRound => ({
+    id: `blickwinkel-adult-${index + 1}`, kind: "pick", category,
+    prompt: language === "en" ? en : de, adultOnly: true
+  }))];
 }

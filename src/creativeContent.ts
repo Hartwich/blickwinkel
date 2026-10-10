@@ -8,10 +8,14 @@ export type CreativeTask = {
   maxStrokes?: 1 | 2;
   useOtherAvatar?: boolean;
   useOwnAvatar?: boolean;
+  requirePhoto?: boolean;
+  useRoundPhoto?: boolean;
+  adultOnly?: boolean;
 };
 
 type TaskRow = readonly [CreativeTask["kind"], string, string, string, string];
 const ownAvatarIds = new Set(["draw-crown", "draw-comic", "draw-weather", "draw-speech"]);
+const photoRemixIds = new Set(["draw-eyes", "draw-map", "draw-cape", "draw-climber"]);
 
 // Each pair is authored for this game; keep ids language independent so rounds
 // remain stable when a room changes its display language.
@@ -58,6 +62,11 @@ const rows: readonly TaskRow[] = [
   ["draw", "Foto-Remix", "Gebt einem Gegenstand auf eurem Foto einen Umhang und eine Superheldenpose.", "Give an object in your photo a cape and a superhero pose.", "draw-cape"],
   ["draw", "Kritzelei", "Zeichnet ein Fantasie-Wetter-Symbol über euer Selfie: Was für ein Tag seid ihr?", "Draw an imaginary weather symbol over your selfie: what kind of day are you?", "draw-weather"],
   ["draw", "Foto-Remix", "Lasst auf eurem Foto eine kleine Figur an einem Gegenstand hochklettern.", "Add a tiny character climbing an object in your photo.", "draw-climber"],
+  ["draw", "Foto-Remix", "Ihr bekommt ein Foto aus einer früheren Fotoaufgabe. Macht daraus mit eurer Zeichnung eine Szene aus einem Science-Fiction-Film.", "You receive a photo from an earlier photo task. Draw over it to turn it into a science-fiction movie scene.", "draw-replay-scifi"],
+  ["draw", "Foto-Remix", "Ergänzt auf dem zugewiesenen Foto einen winzigen Gast, der dort eigentlich nichts zu suchen hat.", "Add a tiny visitor who does not belong in the photo you have been given.", "draw-replay-visitor"],
+  ["draw", "Foto-Remix", "Verwandelt das zugewiesene Foto mit eurer Zeichnung in eine völlig übertriebene Party.", "Draw over the photo you have been given to turn it into a wildly over-the-top party.", "draw-replay-party"],
+  ["draw", "Foto-Remix", "Macht aus dem zugewiesenen Foto ein Plakat für ein erfundenes Abenteuer.", "Turn the photo you have been given into a poster for an imaginary adventure.", "draw-replay-poster"],
+  ["draw", "Foto-Remix", "Zeichnet in das zugewiesene Foto ein geheimes Portal und zeigt, was dahinter wartet.", "Draw a secret portal in the photo you have been given and show what is waiting beyond it.", "draw-replay-portal"],
   ["draw", "Kritzelei", "Zeichnet auf einer leeren Fläche ein Raumschiff, das von einem Snack angetrieben wird.", "On a blank canvas, draw a spaceship powered by a snack.", "draw-snackship"],
   ["draw", "Foto-Remix", "Malt eurem Selfie eine Sprechblase mit einem kurzen, freundlichen Satz.", "Add a speech bubble with a short, friendly line to your selfie.", "draw-speech"],
   ["draw", "Kritzelei", "Zeichnet ein neues Fantasie-Logo für eure Gruppe, nur aus Formen und Linien.", "Draw a new imaginary logo for your group using only shapes and lines.", "draw-logo"],
@@ -78,9 +87,18 @@ const rows: readonly TaskRow[] = [
   ["draw", "Zwei Striche", "Zeichnet mit höchstens zwei Strichen eine lustige neue Frisur.", "Draw a funny new hairstyle using at most two strokes.", "draw-two-strokes"],
 ];
 
-export function getCreativeTasks(language: SupportedLanguage): CreativeTask[] {
+const adultRows: readonly TaskRow[] = [
+  ["text", "Ü18", "Erfindet den schlechtesten Dirty-Talk-Satz, der wie eine Bedienungsanleitung klingt.", "Invent the worst dirty-talk line that sounds like an instruction manual.", "text-adult-manual"],
+  ["text", "Ü18", "Schreibt eine völlig übertriebene Fünf-Sterne-Bewertung für einen One-Night-Stand.", "Write a wildly over-the-top five-star review of a one-night stand.", "text-adult-review"],
+  ["text", "Ü18", "Gebt einem Sexspielzeug einen Namen, als wäre es ein neues Küchengerät.", "Name a sex toy as if it were a new kitchen appliance.", "text-adult-gadget"],
+  ["text", "Ü18", "Welche Ausrede liefert eine Person, deren Handschellen sich nach dem Date nicht mehr öffnen lassen?", "What excuse does someone give when their handcuffs will not open after a date?", "text-adult-handcuffs"],
+  ["text", "Ü18", "Schreibt den Werbespruch für ein Kondom mit einer völlig unnötigen Zusatzfunktion.", "Write a slogan for a condom with a completely unnecessary extra feature.", "text-adult-condom"],
+  ["text", "Ü18", "Erfindet einen peinlichen Betreff für eine dienstliche E-Mail, die versehentlich zum Sexting wird.", "Invent an embarrassing subject line for a work email that accidentally turns into sexting.", "text-adult-email"]
+];
+
+export function getCreativeTasks(language: SupportedLanguage, includeAdult = false): CreativeTask[] {
   const english = language === "en";
-  return rows.map(([kind, category, de, en, id]) => ({
+  return [...rows, ...(includeAdult ? adultRows : [])].map(([kind, category, de, en, id]) => ({
     id,
     kind,
     category,
@@ -89,5 +107,8 @@ export function getCreativeTasks(language: SupportedLanguage): CreativeTask[] {
     ...(id === "draw-two-strokes" ? { maxStrokes: 2 as const } : {}),
     ...(id.startsWith("draw-other-") ? { useOtherAvatar: true } : {}),
     ...(id.startsWith("draw-own-") || ownAvatarIds.has(id) ? { useOwnAvatar: true } : {}),
+    ...(photoRemixIds.has(id) ? { requirePhoto: true } : {}),
+    ...(id.startsWith("draw-replay-") ? { requirePhoto: true, useRoundPhoto: true } : {}),
+    ...(id.startsWith("text-adult-") ? { adultOnly: true } : {}),
   }));
 }

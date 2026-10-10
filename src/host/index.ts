@@ -14,7 +14,6 @@ interface HostGameState {
   entries: HostEntry[]; winnerIds: string[]; roundScores: Record<string, number>; showcaseIndex: number;
 }
 
-const COIN_COUNT = 7;
 const COIN_DELAY = .45;
 const COIN_STAGGER = .12;
 const COIN_DURATION = 1.15;
@@ -47,6 +46,7 @@ const styleText = `
 .bw-score-polaroids{height:min(100%,var(--board-height,560px));align-self:center;align-content:center;gap:clamp(8px,1vw,18px)}.bw-score-polaroids[data-rows="1"]{transform:translateY(clamp(18px,5vh,55px))}.bw-score-polaroid{position:relative;grid-template-rows:minmax(0,1fr) auto;overflow:hidden;animation:bw-polaroid-in .5s both;animation-delay:calc(var(--i)*55ms)}.bw-score-polaroid.is-gold{--medal:#f6df98;animation:bw-polaroid-in .5s both,bw-medal-reveal .65s 2.1s forwards}.bw-score-polaroid.is-silver{--medal:#dce4eb;animation:bw-polaroid-in .5s both,bw-medal-reveal .65s 2.1s forwards}.bw-score-polaroid.is-bronze{--medal:#e9bea0;animation:bw-polaroid-in .5s both,bw-medal-reveal .65s 2.1s forwards}.bw-score-polaroid.is-gold,.bw-score-polaroid.is-silver,.bw-score-polaroid.is-bronze{animation-delay:calc(var(--i)*55ms),2.1s}.bw-score-photo{object-position:center 35%}.bw-score-caption{z-index:2}.bw-coins{position:absolute;inset:clamp(6px,.8vw,12px) clamp(6px,.8vw,12px) 42px;z-index:3;pointer-events:none;overflow:hidden}.bw-coin{position:absolute;top:var(--coin-top,70%);transform:rotate(var(--coin-tilt,20deg));width:clamp(18px,2vw,30px);height:clamp(18px,2vw,30px);display:grid;place-items:center;border:2px solid #b77b16;border-radius:50%;color:#a76c0d;background:radial-gradient(circle at 30% 25%,#fff2ac,#f4c44a 55%,#c98e26);box-shadow:0 3px 5px #66481955;font-size:clamp(9px,1vw,15px);animation:bw-coin-fall ${COIN_DURATION}s calc(${COIN_DELAY}s + var(--coin-i)*${COIN_STAGGER}s - var(--scene-elapsed,0s)) ease-in both}@keyframes bw-polaroid-in{from{opacity:0;transform:translateY(20px) rotate(var(--tilt))}to{opacity:1;transform:translateY(0) rotate(var(--tilt))}}@keyframes bw-coin-fall{0%{opacity:0;top:-25%;transform:rotate(-45deg) scale(.7)}18%{opacity:1}78%{opacity:1;top:var(--coin-top,70%);transform:translateY(0) rotate(var(--coin-tilt,20deg)) scale(1)}90%{opacity:1;top:var(--coin-top,70%);transform:translateY(-7px) rotate(var(--coin-tilt,20deg)) scale(1)}100%{opacity:1;top:var(--coin-top,70%);transform:translateY(0) rotate(var(--coin-tilt,20deg)) scale(1)}}@keyframes bw-medal-reveal{from{background:#fffdf8}to{background:var(--medal)}}
 .bw-vote-wait.is-vote,.bw-vote-wait.is-winner-scene,.bw-score-scene{height:100%;align-self:stretch}.bw-vote-grid.is-dense .bw-vote-text{font-size:clamp(13px,1.35vw,21px)}.bw-score-polaroid.is-gold,.bw-score-polaroid.is-silver,.bw-score-polaroid.is-bronze{animation-delay:calc(var(--i)*55ms - var(--scene-elapsed,0s)),calc(2.6s - var(--scene-elapsed,0s))}
 @media(max-height:760px){.bw-score-polaroids[data-rows="1"]{transform:translateY(16px)}.bw-vote-card{padding:6px}.bw-vote-name{font-size:clamp(10px,1vw,15px)}}@media(max-width:850px){.bw-vote-card{grid-template-columns:minmax(55px,27%) minmax(0,1fr)}.bw-vote-grid{gap:7px}.bw-score-caption{font-size:clamp(10px,1vw,15px)}}@media(prefers-reduced-motion:reduce){.bw-vote-card.is-winner,.bw-spark,.bw-coin,.bw-score-polaroid,.bw-score-polaroid.is-gold,.bw-score-polaroid.is-silver,.bw-score-polaroid.is-bronze{animation:none!important}.bw-score-polaroid.is-gold,.bw-score-polaroid.is-silver,.bw-score-polaroid.is-bronze{background:var(--medal)}}
+.bw-score-scene.has-awards{grid-template-rows:auto auto auto minmax(0,1fr)}.bw-score-award{font-size:clamp(15px,1.6vw,24px);font-weight:800;color:var(--ink);text-wrap:balance}.bw-score-gain{position:absolute;top:clamp(10px,1vw,16px);right:clamp(10px,1vw,16px);z-index:4;display:grid;place-items:center;min-width:1.9em;padding:.18em .3em;border-radius:10px;background:var(--yellow);color:var(--ink);box-shadow:0 4px 12px #35243a30;font-size:clamp(22px,2.6vw,36px);font-weight:950;font-variant-numeric:tabular-nums;animation:bw-gain .45s calc(var(--award-at,2s) - var(--scene-elapsed,0s)) cubic-bezier(.16,.8,.2,1) both}@keyframes bw-gain{from{opacity:0;transform:translateY(-12px) scale(.65)}65%{opacity:1;transform:translateY(0) scale(1.12)}to{opacity:1;transform:translateY(0) scale(1)}}@media(prefers-reduced-motion:reduce){.bw-score-gain{animation:none!important}}
 `;
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
@@ -89,7 +89,7 @@ function entryCard(entry: HostEntry, en: boolean, index: number, avatar?: string
   return card;
 }
 
-function voteCard(entry: HostEntry, avatar: string | undefined, en: boolean, index: number, winner = false): HTMLElement {
+function voteCard(entry: HostEntry, avatar: string | undefined, en: boolean, index: number, winner = false, points = 0): HTMLElement {
   const media = safePhoto(entry.media);
   const card = el("article", `bw-vote-card${media ? " is-image" : ""}${winner ? " is-winner" : ""}`);
   card.style.setProperty("--i", String(index));
@@ -108,7 +108,7 @@ function voteCard(entry: HostEntry, avatar: string | undefined, en: boolean, ind
     card.append(identity, answer);
   }
   if (winner) {
-    card.append(el("span", "bw-winner-seal", en ? "WINNER" : "GEWINNT"));
+    card.append(el("span", "bw-winner-seal", `${en ? "WINNER" : "GEWINNT"}${points > 0 ? ` · +${points}` : ""}`));
     const firework = el("div", "bw-firework");
     firework.setAttribute("aria-hidden", "true");
     for (let spark = 0; spark < 14; spark += 1) {
@@ -135,14 +135,12 @@ function voteGrid(state: Partial<HostGameState>, en: boolean, reveal: boolean): 
   grid.style.setProperty("--vote-photo-size", entries.length >= 13 ? "64px" : entries.length >= 10 ? "78px" : entries.length >= 7 ? "92px" : entries.length >= 5 ? "108px" : "150px");
   const avatars = new Map((state.playerNames ?? []).map(({ id, avatar }) => [id, avatar]));
   entries.forEach((entry, index) => grid.append(voteCard(entry, avatars.get(entry.authorId ?? ""), en, index,
-    reveal && (state.winnerIds ?? []).includes(entry.id))));
+    reveal && (state.winnerIds ?? []).includes(entry.id), state.roundScores?.[entry.authorId ?? ""] ?? 0)));
   return grid;
 }
 
 function roundWinnerPlayers(state: Partial<HostGameState>): Set<string> {
-  if (state.round?.kind === "pick") return new Set(state.winnerIds ?? []);
-  const winningEntries = new Set(state.winnerIds ?? []);
-  return new Set((state.entries ?? []).filter(({ id }) => winningEntries.has(id)).map(({ authorId }) => authorId ?? ""));
+  return new Set(Object.entries(state.roundScores ?? {}).filter(([, points]) => points > 0).map(([id]) => id));
 }
 
 function scoreboardNode(state: Partial<HostGameState>, en: boolean, final = false): HTMLElement {
@@ -160,7 +158,16 @@ function scoreboardNode(state: Partial<HostGameState>, en: boolean, final = fals
   grid.style.setProperty("--board-width", `${columns * cardWidth + (columns - 1) * 18 + 24}px`);
   grid.style.setProperty("--board-height", rows === 1 ? "286px" : rows === 2 ? "470px" : "560px");
   grid.dataset.rows = String(rows);
-  const roundWinners = roundWinnerPlayers(state);
+  const roundWinners = final ? new Set<string>() : roundWinnerPlayers(state);
+  if (!final) {
+    board.classList.add("has-awards");
+    const winner = players.find(({ id }) => roundWinners.has(id));
+    const points = winner ? state.roundScores?.[winner.id] ?? 0 : 0;
+    const pointsText = `${points} ${en ? (points === 1 ? "point" : "points") : (points === 1 ? "Punkt" : "Punkte")}`;
+    board.append(el("p", "bw-score-award", !winner ? (en ? "No points this round" : "Diesmal keine Punkte")
+      : roundWinners.size === 1 ? `${winner.name} +${pointsText}`
+      : en ? `Shared win · +${pointsText} each` : `Geteilter Sieg · jeweils +${pointsText}`));
+  }
   players.forEach((player, index) => {
     const medal = index < 3 ? (["gold", "silver", "bronze"] as const)[index] : undefined;
     const card = el("article", `bw-score-polaroid${medal ? ` is-${medal}` : ""}${roundWinners.has(player.id) ? " is-round-winner" : ""}`);
@@ -172,16 +179,20 @@ function scoreboardNode(state: Partial<HostGameState>, en: boolean, final = fals
       card.append(photo);
     } else card.append(el("div", "bw-score-photo bw-score-photo-fallback", player.name.slice(0, 1).toUpperCase()));
     if (roundWinners.has(player.id)) {
+      const gain = state.roundScores?.[player.id] ?? 0;
+      card.style.setProperty("--award-at", `${COIN_DELAY + (gain - 1) * COIN_STAGGER + COIN_DURATION}s`);
       const coins = el("div", "bw-coins"); coins.setAttribute("aria-hidden", "true");
-      for (let coinIndex = 0; coinIndex < COIN_COUNT; coinIndex += 1) {
-        const coin = el("span", "bw-coin", "★");
+      for (let coinIndex = 0; coinIndex < gain; coinIndex += 1) {
+        const coin = el("span", "bw-coin", "1");
         coin.style.setProperty("--coin-i", String(coinIndex));
         coin.style.setProperty("--coin-top", `${64 + coinIndex % 3 * 6}%`);
         coin.style.setProperty("--coin-tilt", `${coinIndex % 2 ? -18 : 22}deg`);
-        coin.style.left = `${8 + coinIndex * 12}%`;
+        coin.style.left = `${20 + (coinIndex + .5) / gain * 60}%`;
         coins.append(coin);
       }
-      card.append(coins);
+      const award = el("strong", "bw-score-gain", `+${gain}`);
+      award.setAttribute("aria-label", `${player.name}: +${gain} ${en ? (gain === 1 ? "point" : "points") : (gain === 1 ? "Punkt" : "Punkte")}`);
+      card.append(coins, award);
     }
     const caption = el("div", "bw-score-caption");
     caption.append(el("span", "bw-score-rank", `${index + 1}.`), el("strong", "bw-score-name", player.name),
@@ -206,7 +217,7 @@ export function mountBlickwinkelHost(rootInput: unknown, source: HostGameStateSo
   let audio: AudioContext | null = null;
   let ticker = 0;
   const activeTones = new Set<OscillatorNode>();
-  const playCue = (key: string, cue: "answer" | "winner" | "coins" | "gallery" = "answer") => {
+  const playCue = (key: string, cue: "answer" | "winner" | "coins" | "gallery" = "answer", coinCount = 0) => {
     if (key === lastCueKey) return;
     lastCueKey = key;
     try {
@@ -230,7 +241,7 @@ export function mountBlickwinkelHost(rootInput: unknown, source: HostGameStateSo
         oscillator.start(start); oscillator.stop(start + duration + .01);
       };
       if (cue === "coins") {
-        for (let index = 0; index < COIN_COUNT; index += 1) {
+        for (let index = 0; index < coinCount; index += 1) {
           const landing = COIN_DELAY + index * COIN_STAGGER + COIN_LANDING;
           // Two bright partials give each landing a small metallic clink.
           tone(1568 + index % 3 * 110, landing, .16, .055, "triangle");
@@ -329,7 +340,7 @@ export function mountBlickwinkelHost(rootInput: unknown, source: HostGameStateSo
       if (winnerCount) playCue(`winner:${state.roundIndex}`, "winner");
     } else if (stage === "scoreboard") {
       body.append(scoreboardNode(state, en));
-      if (roundWinnerPlayers(state).size) playCue(`scoreboard:${state.roundIndex}`, "coins");
+      if (roundWinnerPlayers(state).size) playCue(`scoreboard:${state.roundIndex}`, "coins", Math.max(0, ...Object.values(state.roundScores ?? {})));
     } else if (stage === "countdown") {
       const next = el("section", "bw-vote-wait");
       next.append(el("p", "bw-kicker", en ? "NEXT TASK" : "NÄCHSTE AUFGABE"), el("h1", undefined, (state.roundIndex ?? 0) < 0 ? (en ? "Here we go!" : "Los geht’s!") : (en ? "Ready for the next one?" : "Bereit für die nächste Aufgabe?")));
@@ -372,7 +383,7 @@ export function mountBlickwinkelHost(rootInput: unknown, source: HostGameStateSo
     if (!node || !clock) return;
     const remaining = state?.finishAt ? Math.max(0, Math.ceil((state.finishAt - Date.now()) / 1000)) : null;
     node.textContent = remaining === null ? "∞" : String(remaining);
-    const duration = state?.stage === "countdown" ? 3_000 : state?.round?.kind === "pick" ? 25_000 : state?.round?.kind === "text" ? 70_000 : state?.round?.kind === "photo" ? 90_000 : 120_000;
+    const duration = state?.stage === "countdown" ? 3_000 : state?.round?.kind === "pick" ? 25_000 : state?.round?.kind === "text" ? 70_000 : state?.round?.kind === "photo" ? 120_000 : 150_000;
     clock.style.setProperty("--progress", `${remaining === null ? 100 : Math.max(0, Math.min(100, remaining / (duration / 1000) * 100))}%`);
   };
   const typedSource = source as HostGameStateSource<HostStateLike>;

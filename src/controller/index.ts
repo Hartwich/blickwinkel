@@ -4,6 +4,7 @@ import type { BlickwinkelControllerState } from "../protocol.js";
 
 interface ControllerContext {
   state: {
+    connected?: boolean;
     preferredLanguage?: "de" | "en";
     room?: { language?: "de" | "en"; players?: Array<{ id: string; name: string; avatar?: string }> } | null;
     player?: { id: string } | null;
@@ -48,6 +49,8 @@ export const controllerGame = {
       resetKey: `${state.game?.roundNumber ?? 0}:${roundId}`,
       maxStrokes: round?.maxStrokes,
       basePhoto: game.basePhoto,
+      requirePhoto: round?.requirePhoto,
+      connected: state.connected,
       hasSubmitted: Boolean(game.hasSubmitted),
       disabled: !inPlay || Boolean(game.hasSubmitted),
       selectedId: game.selectedId,
