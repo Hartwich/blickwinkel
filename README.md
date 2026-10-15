@@ -16,6 +16,8 @@ Photo editing follows the original image aspect ratio, with a larger canvas and 
 
 ## Run
 
+Progress updates keep the mounted host scene, photos and animations in place; only counters, progress bars and clocks change after submissions or ballots. Different tasks/results and changed visible content still render a new scene. The manifest opts into `broadcast.reliableState`, which requires the matching platform update: authoritative confirmations and stage changes queue while transports are busy instead of being discarded as volatile packets or skipped by host throttling. Input-only phone screens omit the other players' character images; ballots retain names and avatars, and assigned editing backgrounds remain private to their recipient. Focused Socket.IO checks with 16 simultaneous 80 kB photo submissions passed over both WebSocket and HTTP polling under simulated outbound backpressure, including duplicate rejection and final confirmation delivery. In-app host checks at 1280×720 retained scene/image DOM nodes through 16 progress updates and still switched scenes for the next result. Real-device camera, Wi-Fi and audio behavior remain to be checked.
+
 From the platform root, run `npm run games:sync-local`, then `npm run typecheck` and `npm run build`. The game appears in the catalog for rooms with 1–16 players.
 
 The matching platform update is required for camera/gallery decoding, submission
@@ -25,3 +27,7 @@ disconnect/retry behavior still require real-phone playtesting.
 ## Package exports
 
 `@open-party-lab/game-blickwinkel` exposes the manifest, protocol, authoritative server game, DOM host surface, and phone controller builder. The phone uses the platform's reusable `social_party` layout.
+
+## Lobby selfies
+
+Blickwinkel uses optional `GamePlayerSummary.avatar` photos from the platform lobby. Players with a photo are already counted as submitted in the initial selfie phase; when everyone has a photo, the game proceeds to its first countdown.

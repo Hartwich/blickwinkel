@@ -11,6 +11,7 @@ export const blickwinkelManifest = {
   controllerLayout: "social_party",
   supportsTeams: false,
   scoreScope: "game",
+  broadcast: { reliableState: true },
   lobbySetup: {
     title: "Blickwinkel einrichten",
     fields: [{

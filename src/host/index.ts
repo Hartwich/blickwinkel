@@ -2,7 +2,7 @@ import type { HostGame, HostGameStateSource } from "@open-party-lab/game-core";
 import { blickwinkelManifest } from "../manifest.js";
 
 interface HostStateLike {
-  game?: { phase?: string; state?: unknown; updatedAt?: number } | null;
+  game?: { phase?: string; roundNumber?: number; state?: unknown; updatedAt?: number } | null;
   room?: { language?: "de" | "en" } | null;
 }
 interface HostRound { id: string; kind: "pick" | "text" | "photo" | "draw"; category: string; prompt: string; useOtherAvatar?: boolean; useOwnAvatar?: boolean; }
@@ -203,6 +203,32 @@ function scoreboardNode(state: Partial<HostGameState>, en: boolean, final = fals
   return board;
 }
 
+function sameSceneContent(previous: Partial<HostGameState> | null, next: Partial<HostGameState>): boolean {
+  if (!previous || previous.round?.prompt !== next.round?.prompt ||
+      previous.round?.useOtherAvatar !== next.round?.useOtherAvatar || previous.round?.useOwnAvatar !== next.round?.useOwnAvatar ||
+      previous.rounds?.length !== next.rounds?.length) return false;
+  // These scenes display only progress and a clock, not incoming player photos.
+  if (next.stage === "avatar" || next.stage === "countdown") return true;
+  const players = previous.playerNames ?? [], nextPlayers = next.playerNames ?? [];
+  if (players.length !== nextPlayers.length || players.some((player, index) => {
+    const other = nextPlayers[index];
+    return player.id !== other?.id || player.name !== other.name || player.avatar !== other.avatar;
+  })) return false;
+  if (next.stage === "submit") return true;
+  const entries = previous.entries ?? [], nextEntries = next.entries ?? [];
+  if (entries.length !== nextEntries.length || entries.some((entry, index) => {
+    const other = nextEntries[index];
+    return entry.id !== other?.id || entry.text !== other.text || entry.media !== other.media ||
+      entry.authorId !== other.authorId || entry.authorName !== other.authorName || entry.label !== other.label || entry.votes !== other.votes;
+  })) return false;
+  const winners = previous.winnerIds ?? [], nextWinners = next.winnerIds ?? [];
+  if (winners.length !== nextWinners.length || winners.some((id, index) => id !== nextWinners[index])) return false;
+  return (["totals", "roundScores"] as const).every((key) => {
+    const before = previous[key] ?? {}, after = next[key] ?? {};
+    return Object.keys(before).length === Object.keys(after).length && Object.keys(before).every((id) => before[id] === after[id]);
+  });
+}
+
 export function mountBlickwinkelHost(rootInput: unknown, source: HostGameStateSource): () => void {
   const root = rootInput as HTMLElement;
   const style = el("style");
@@ -210,7 +236,7 @@ export function mountBlickwinkelHost(rootInput: unknown, source: HostGameStateSo
   root.className = "bw-host-mount";
   root.replaceChildren(style);
   let current: HostStateLike | null = null;
-  let lastRenderKey = "";
+  let displayedState: Partial<HostGameState> | null = null;
   let lastCueKey = "";
   let animationSceneKey = "";
   let sceneStartedAt = 0;
@@ -264,10 +290,16 @@ export function mountBlickwinkelHost(rootInput: unknown, source: HostGameStateSo
     const state = (appState?.game?.state ?? {}) as Partial<HostGameState>;
     const stage = state.stage ?? "finished";
     const en = appState?.room?.language === "en";
-    const renderKey = `${appState?.game?.updatedAt ?? ""}:${appState?.game?.phase ?? ""}:${state?.stage ?? ""}:${appState?.room?.language ?? "de"}`;
-    if (renderKey === lastRenderKey) { updateClock(); return; }
-    lastRenderKey = renderKey;
-    const sceneKey = `${stage}:${state.roundIndex}:${state.round?.id}:${state.showcaseIndex}`;
+    const sceneKey = `${appState?.game?.roundNumber}:${appState?.game?.phase}:${stage}:${state.roundIndex}:${state.round?.id}:${state.showcaseIndex}:${en}`;
+    if (sceneKey === animationSceneKey && sameSceneContent(displayedState, state)) {
+      displayedState = state;
+      const progress = root.querySelector<HTMLElement>(".bw-progress");
+      const count = state.submittedCount ?? 0, total = state.playerNames?.length ?? 0;
+      if (progress) progress.textContent = `${count} / ${total}${stage === "vote" ? (en ? " votes" : " Stimmen") : stage === "submit" ? (en ? " in" : " abgegeben") : ""}`;
+      root.querySelector<HTMLElement>(".bw-progressbar i")?.style.setProperty("--done", `${total ? Math.min(100, count / total * 100) : 0}%`);
+      updateClock(); return;
+    }
+    displayedState = state;
     if (sceneKey !== animationSceneKey) {
       animationSceneKey = sceneKey;
       sceneStartedAt = performance.now();

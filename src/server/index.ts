@@ -296,7 +296,8 @@ export const serverGame: ServerGame<BlickwinkelState, BlickwinkelInput, Blickwin
   startRound(state, context) {
     const rounds = chooseRounds(context);
     const round = rounds[0] ?? null;
-    return transitionRoundState({
+    const avatarsByPlayer = Object.fromEntries(context.players.filter(({ avatar }) => avatar).map(({ id, avatar }) => [id, avatar as string]));
+    const next = transitionRoundState<BlickwinkelState>({
       ...state,
       stage: "avatar",
       rounds,
@@ -311,7 +312,7 @@ export const serverGame: ServerGame<BlickwinkelState, BlickwinkelInput, Blickwin
       totals: Object.fromEntries(context.players.map(({ id }) => [id, 0])),
       roundScores: {},
       winnerIds: [],
-      avatarsByPlayer: {},
+      avatarsByPlayer,
       avatarTargetByPlayer: {},
       completedPhotosByPlayer: {},
       assignedPhotosByPlayer: {},
@@ -320,6 +321,10 @@ export const serverGame: ServerGame<BlickwinkelState, BlickwinkelInput, Blickwin
       startedAt: context.now,
       message: context.language === "en" ? "Take your character selfie." : "Macht zuerst euer Charakterfoto."
     });
+    next.submittedCount = Object.keys(avatarsByPlayer).length;
+    return round && next.submittedCount >= context.players.length
+      ? stageState({ ...next, submittedCount: 0, message: "" }, "countdown", context, countdownMs)
+      : next;
   },
 
   handleInput(state, input, context) {
@@ -456,11 +461,14 @@ export const serverGame: ServerGame<BlickwinkelState, BlickwinkelInput, Blickwin
   },
 
   toControllerStateForPlayer(state, context, playerId): BlickwinkelControllerState {
+    const needsBallotPhotos = state.stage === "vote" || (state.stage === "submit" && state.round?.kind === "pick");
     const selectedId = state.round?.kind === "pick"
       ? state.submissionsByPlayer[playerId]
       : state.ballotsByPlayer[playerId];
     return {
       ...toPublic(state, context),
+      // Input-only screens need no copies of every player's character photo.
+      playerNames: context.players.map(({ id, name }) => ({ id, name, ...(needsBallotPhotos ? { avatar: state.avatarsByPlayer[id] } : {}) })),
       entries: state.entries.map(({ id, label, authorId, authorName }) => ({ id, label, authorId, authorName })),
       hasSubmitted: state.stage === "avatar"
         ? hasSubmitted(state.avatarsByPlayer, playerId)
@@ -469,7 +477,8 @@ export const serverGame: ServerGame<BlickwinkelState, BlickwinkelInput, Blickwin
         : hasSubmitted(state.ballotsByPlayer, playerId),
       selectedId,
       ownEntryId: Object.keys(state.entryOwnerById).find((id) => state.entryOwnerById[id] === playerId),
-      basePhoto: state.round?.useRoundPhoto ? state.assignedPhotosByPlayer[playerId]
+      basePhoto: state.stage !== "submit" ? undefined
+        : state.round?.useRoundPhoto ? state.assignedPhotosByPlayer[playerId]
         : state.round?.useOtherAvatar || state.round?.useOwnAvatar
         ? state.avatarsByPlayer[state.avatarTargetByPlayer[playerId] ?? ""]
         : undefined
